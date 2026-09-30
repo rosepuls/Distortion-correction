@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# VSCode
+.vscode/
+
+# Vivado generated files
+.Xil/
+xsim.dir/
+*.jou
+*.log
+*.str
+*.wdb
+*.vcd
+*.pb
+*.cache/
+*.gen/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+
+# PDS / Fabric Compiler generated files
+# Keep the project definition (.pds), source constraints, and curated reports only.
+pds/*/compile/
+pds/*/constraint_check/
+pds/*/device_map/
+pds/*/place_route/
+pds/*/report_timing/
+pds/*/synthesize/
+pds/*/impl.tcl
+pds/*/multiseed_summary.csv
+pds/*/pds.log
+pds/*/run.log
+
+# Local test-runner cache
+.pytest_cache/
+pytest-cache-files-*/
+
+# Generated comparison outputs
+result/*
+!result/.gitkeep
+vectors/actual/*
+!vectors/actual/.gitkeep
