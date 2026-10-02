@@ -210,6 +210,10 @@ module tb_pixel_tile_cache;
         // First miss fills one Tile; the next lookup crosses its x boundary.
         lookup_and_check(1, 1, 1, 4);
         lookup_and_check(31, 1, 1, 4);
+        // Tile (0,1) hashes to set 15; verify the full set index is retained
+        // instead of being truncated to the way-index width.
+        lookup_and_check(1, 3, 1, 4);
+        lookup_and_check(1, 3, 1, 0);
         lookup_and_check(639, 1, 0, 0);
 
         // Eight tags map to one set.  Promote tile (0,0) before adding the

@@ -43,6 +43,7 @@ module pixel_tile_cache #(
     input  wire [1:0]                   fill_data_beat_index
 );
     localparam integer WAY_WIDTH = (WAYS <= 1) ? 1 : $clog2(WAYS);
+    localparam integer SET_WIDTH = (SET_COUNT <= 1) ? 1 : $clog2(SET_COUNT);
     localparam integer BANK_PIXELS_PER_TILE = (TILE_W * TILE_H) / 4;
     localparam integer BANK_DEPTH = SET_COUNT * WAYS * BANK_PIXELS_PER_TILE;
 
@@ -60,7 +61,7 @@ module pixel_tile_cache #(
     reg [COORD_WIDTH-1:0] pending_tile_x;
     reg [COORD_WIDTH-1:0] pending_tile_y;
     reg [WAY_WIDTH-1:0] pending_way;
-    reg [WAY_WIDTH-1:0] pending_set;
+    reg [SET_WIDTH-1:0] pending_set;
     reg [1:0] pending_row;
 
     reg valid_mem [0:SET_COUNT-1][0:WAYS-1];
