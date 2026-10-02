@@ -10,7 +10,9 @@ module mes50hp_top #(
     parameter integer IMAGE_WIDTH = 1280,
     parameter integer IMAGE_HEIGHT = 720,
     parameter integer COORD_WIDTH = 13,
-    parameter integer ADDR_WIDTH = 32
+    parameter integer ADDR_WIDTH = 32,
+    parameter integer USE_TILE_CACHE = 0,
+    parameter [ADDR_WIDTH-1:0] FRAME_BASE_BYTE_ADDR = {ADDR_WIDTH{1'b0}}
 ) (
     input  wire                         clk,
     input  wire                         reset_n,
@@ -35,6 +37,15 @@ module mes50hp_top #(
     input  wire                         mem_rsp_valid,
     output wire                         mem_rsp_ready,
     input  wire [23:0]                  mem_rsp_data,
+
+    output wire                         cache_rd_cmd_en,
+    input  wire                         cache_rd_cmd_ready,
+    output wire [ADDR_WIDTH-1:0]        cache_rd_cmd_addr,
+    output wire [31:0]                  cache_rd_cmd_len,
+    input  wire                         cache_rd_data_valid,
+    output wire                         cache_rd_data_ready,
+    input  wire [255:0]                 cache_rd_data,
+    input  wire                         cache_rd_data_last,
 
     output wire [23:0]                  out_pixel,
     output wire                         out_valid,
@@ -74,7 +85,9 @@ module mes50hp_top #(
         .IMAGE_HEIGHT(IMAGE_HEIGHT),
         .COORD_WIDTH(COORD_WIDTH),
         .ADDR_WIDTH(ADDR_WIDTH),
-        .USE_OPTIMIZED_CORE(1)
+        .USE_OPTIMIZED_CORE(1),
+        .USE_TILE_CACHE(USE_TILE_CACHE),
+        .FRAME_BASE_BYTE_ADDR(FRAME_BASE_BYTE_ADDR)
     ) pipeline_inst (
         .clk(clk),
         .rst_n(core_rst_n),
@@ -98,6 +111,14 @@ module mes50hp_top #(
         .rsp_valid(mem_rsp_valid),
         .rsp_ready(mem_rsp_ready),
         .rsp_data(mem_rsp_data),
+        .cache_rd_cmd_en(cache_rd_cmd_en),
+        .cache_rd_cmd_ready(cache_rd_cmd_ready),
+        .cache_rd_cmd_addr(cache_rd_cmd_addr),
+        .cache_rd_cmd_len(cache_rd_cmd_len),
+        .cache_rd_data_valid(cache_rd_data_valid),
+        .cache_rd_data_ready(cache_rd_data_ready),
+        .cache_rd_data(cache_rd_data),
+        .cache_rd_data_last(cache_rd_data_last),
         .out_pixel(out_pixel),
         .out_valid(out_valid),
         .out_sof(out_sof),
