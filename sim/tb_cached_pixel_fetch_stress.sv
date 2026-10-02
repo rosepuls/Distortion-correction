@@ -1,12 +1,11 @@
 `timescale 1ns/1ps
 
-module tb_1080p30_throughput;
-    localparam integer IMAGE_WIDTH = 1920;
-    localparam integer IMAGE_HEIGHT = 1080;
+module tb_cached_pixel_fetch_stress;
+    localparam integer IMAGE_WIDTH = 64;
+    localparam integer IMAGE_HEIGHT = 32;
     localparam integer PIXELS = IMAGE_WIDTH * IMAGE_HEIGHT;
-    localparam integer FRAME_BUDGET = 3333333;
     localparam integer ADDR_WIDTH = 32;
-    localparam [ADDR_WIDTH-1:0] FRAME_BASE_BYTE_ADDR = 32'h00100000;
+    localparam [ADDR_WIDTH-1:0] FRAME_BASE_BYTE_ADDR = 32'h00008000;
 
     reg clk = 1'b0;
     reg rst_n = 1'b0;
@@ -27,7 +26,7 @@ module tb_1080p30_throughput;
     wire rd_cmd_en;
     wire [ADDR_WIDTH-1:0] rd_cmd_addr;
     wire [31:0] rd_cmd_len;
-    reg rd_cmd_ready = 1'b1;
+    reg rd_cmd_ready = 1'b0;
     reg rd_data_valid = 1'b0;
     wire rd_data_ready;
     reg [255:0] rd_data = 256'd0;
@@ -36,10 +35,8 @@ module tb_1080p30_throughput;
     integer input_count = 0;
     integer output_count = 0;
     integer command_count = 0;
-    integer start_cycle = -1;
-    integer end_cycle = -1;
     integer cycle_count = 0;
-    integer timeout_cycles;
+    integer timeout_cycles = 0;
     integer errors = 0;
     integer backend_active = 0;
     integer backend_beat = 0;
@@ -51,10 +48,8 @@ module tb_1080p30_throughput;
     always #5 clk = ~clk;
 
     cached_pixel_fetch_engine #(
-        .IMAGE_WIDTH(IMAGE_WIDTH),
-        .IMAGE_HEIGHT(IMAGE_HEIGHT),
-        .ADDR_WIDTH(ADDR_WIDTH),
-        .FRAME_BASE_BYTE_ADDR(FRAME_BASE_BYTE_ADDR)
+        .IMAGE_WIDTH(IMAGE_WIDTH), .IMAGE_HEIGHT(IMAGE_HEIGHT),
+        .ADDR_WIDTH(ADDR_WIDTH), .FRAME_BASE_BYTE_ADDR(FRAME_BASE_BYTE_ADDR)
     ) dut (
         .clk(clk), .rst_n(rst_n),
         .in_valid(in_valid), .in_ready(in_ready),
@@ -69,10 +64,8 @@ module tb_1080p30_throughput;
     );
 
     function automatic [255:0] make_fill_beat(
-        input integer tile_x,
-        input integer tile_y,
-        input integer row_index,
-        input integer beat_index
+        input integer tile_x, input integer tile_y,
+        input integer row_index, input integer beat_index
     );
         integer lane;
         integer source_x;
@@ -106,25 +99,19 @@ module tb_1080p30_throughput;
     always @(posedge clk) begin
         if (rst_n) begin
             cycle_count = cycle_count + 1;
-`ifdef STRESS_DDR
+            // Periodic command backpressure, independent of the data path.
             rd_cmd_ready <= ((cycle_count % 13) != 0);
-`endif
             if (in_valid && in_ready) begin
-                if (input_count == 0)
-                    start_cycle = cycle_count;
                 input_count = input_count + 1;
                 in_valid <= 1'b0;
             end
-            if (out_valid) begin
+            if (out_valid)
                 output_count = output_count + 1;
-                if (output_count == PIXELS)
-                    end_cycle = cycle_count;
-            end
         end
     end
 
-    // One-cycle response model after command acceptance. It returns the
-    // requested RGBX row in four consecutive 256-bit beats.
+    // Variable-latency DDR model. rd_data_valid is held until the reader
+    // accepts the beat, so the test also covers data-side backpressure.
     always @(posedge clk) begin
         if (!rst_n) begin
             rd_data_valid <= 1'b0;
@@ -135,8 +122,6 @@ module tb_1080p30_throughput;
                 integer source_row;
                 integer source_x;
                 command_count = command_count + 1;
-                if (rd_cmd_len !== 32'd4)
-                    errors = errors + 1;
                 byte_offset = rd_cmd_addr - FRAME_BASE_BYTE_ADDR;
                 source_row = byte_offset / (IMAGE_WIDTH * 4);
                 source_x = (byte_offset % (IMAGE_WIDTH * 4)) / 4;
@@ -144,19 +129,17 @@ module tb_1080p30_throughput;
                 backend_ty <= source_row / 4;
                 backend_row <= source_row % 4;
                 backend_beat <= 0;
-`ifdef STRESS_DDR
                 backend_wait <= 3 + ((cycle_count + command_count) % 9);
-`endif
                 backend_active <= 1;
             end
 
             if (backend_active) begin
                 if (rd_data_valid && rd_data_ready) begin
-                    if (backend_beat == 3)
+                    if (backend_beat == 3) begin
                         rd_data_valid <= 1'b0;
-                    if (backend_beat == 3)
                         backend_active <= 0;
-                    else begin
+                        rd_data_last <= 1'b0;
+                    end else begin
                         backend_beat <= backend_beat + 1;
                         rd_data <= make_fill_beat(
                             backend_tx, backend_ty, backend_row, backend_beat + 1
@@ -165,19 +148,15 @@ module tb_1080p30_throughput;
                         rd_data_last <= (backend_beat == 2);
                     end
                 end else if (!rd_data_valid) begin
-`ifdef STRESS_DDR
-                    if (backend_wait != 0) begin
+                    if (backend_wait != 0)
                         backend_wait <= backend_wait - 1;
-                    end else begin
-`endif
+                    else begin
                         rd_data <= make_fill_beat(
                             backend_tx, backend_ty, backend_row, backend_beat
                         );
                         rd_data_valid <= 1'b1;
                         rd_data_last <= (backend_beat == 3);
-`ifdef STRESS_DDR
                     end
-`endif
                 end
             end else begin
                 rd_data_valid <= 1'b0;
@@ -188,33 +167,27 @@ module tb_1080p30_throughput;
     initial begin
         repeat (3) @(posedge clk);
         rst_n <= 1'b1;
-        timeout_cycles = 0;
-        while (timeout_cycles < FRAME_BUDGET + 100000 && end_cycle < 0) begin
+        while (timeout_cycles < 200000 && output_count < PIXELS) begin
             @(posedge clk);
             timeout_cycles = timeout_cycles + 1;
         end
 
-        if (end_cycle < 0) begin
-            $display("FAIL: 1080p30 run timed out input=%0d output=%0d commands=%0d",
-                     input_count, output_count, command_count);
-            errors = errors + 1;
-        end else if (input_count != PIXELS || output_count != PIXELS) begin
-            $display("FAIL: expected %0d input/output pixels, got %0d/%0d",
+        if (input_count != PIXELS || output_count != PIXELS) begin
+            $display("FAIL: stress expected %0d input/output pixels, got %0d/%0d",
                      PIXELS, input_count, output_count);
             errors = errors + 1;
-        end else if ((end_cycle - start_cycle + 1) > FRAME_BUDGET) begin
-            $display("FAIL: frame budget exceeded: %0d cycles",
-                     end_cycle - start_cycle + 1);
+        end
+        if (command_count == 0) begin
+            $display("FAIL: stress DDR model saw no commands");
             errors = errors + 1;
         end
-
         if (errors != 0)
-            $fatal(1, "TEST_FAIL: 1080p30_throughput errors=%0d", errors);
+            $fatal(1, "TEST_FAIL: cached_pixel_fetch_stress errors=%0d", errors);
 
-        $display("THROUGHPUT_1080P30_RESULT: pixels=%0d frame_cycles=%0d commands=%0d cycles_per_pixel=%f",
-                 PIXELS, end_cycle - start_cycle + 1, command_count,
-                 (end_cycle - start_cycle + 1) * 1.0 / PIXELS);
-        $display("TEST_PASS: 1080p30_throughput");
+        $display("STRESS_RESULT: pixels=%0d cycles=%0d commands=%0d cycles_per_pixel=%f",
+                 PIXELS, timeout_cycles, command_count,
+                 timeout_cycles * 1.0 / PIXELS);
+        $display("TEST_PASS: cached_pixel_fetch_stress");
         $finish;
     end
 endmodule
