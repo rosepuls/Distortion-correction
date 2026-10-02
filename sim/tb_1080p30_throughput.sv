@@ -1,11 +1,12 @@
 `timescale 1ns/1ps
 
-module tb_cached_pixel_fetch_throughput;
-    localparam integer IMAGE_WIDTH = 64;
-    localparam integer IMAGE_HEIGHT = 32;
+module tb_1080p30_throughput;
+    localparam integer IMAGE_WIDTH = 1920;
+    localparam integer IMAGE_HEIGHT = 1080;
     localparam integer PIXELS = IMAGE_WIDTH * IMAGE_HEIGHT;
+    localparam integer FRAME_BUDGET = 3333333;
     localparam integer ADDR_WIDTH = 32;
-    localparam [ADDR_WIDTH-1:0] FRAME_BASE_BYTE_ADDR = 32'h00006000;
+    localparam [ADDR_WIDTH-1:0] FRAME_BASE_BYTE_ADDR = 32'h00100000;
 
     reg clk = 1'b0;
     reg rst_n = 1'b0;
@@ -81,10 +82,7 @@ module tb_cached_pixel_fetch_throughput;
                 source_x = tile_x * 32 + beat_index * 8 + lane;
                 source_y = tile_y * 4 + row_index;
                 make_fill_beat[lane*32 +: 32] = {
-                    8'hC3,
-                    source_y[7:0],
-                    source_x[7:0],
-                    8'h00
+                    8'hC3, source_y[7:0], source_x[7:0], 8'h00
                 };
             end
         end
@@ -121,6 +119,8 @@ module tb_cached_pixel_fetch_throughput;
         end
     end
 
+    // One-cycle response model after command acceptance. It returns the
+    // requested RGBX row in four consecutive 256-bit beats.
     always @(posedge clk) begin
         if (!rst_n) begin
             rd_data_valid <= 1'b0;
@@ -131,6 +131,8 @@ module tb_cached_pixel_fetch_throughput;
                 integer source_row;
                 integer source_x;
                 command_count = command_count + 1;
+                if (rd_cmd_len !== 32'd4)
+                    errors = errors + 1;
                 byte_offset = rd_cmd_addr - FRAME_BASE_BYTE_ADDR;
                 source_row = byte_offset / (IMAGE_WIDTH * 4);
                 source_x = (byte_offset % (IMAGE_WIDTH * 4)) / 4;
@@ -161,39 +163,32 @@ module tb_cached_pixel_fetch_throughput;
         repeat (3) @(posedge clk);
         rst_n <= 1'b1;
         timeout_cycles = 0;
-        while (timeout_cycles < 200000 && end_cycle < 0) begin
+        while (timeout_cycles < FRAME_BUDGET + 100000 && end_cycle < 0) begin
             @(posedge clk);
             timeout_cycles = timeout_cycles + 1;
         end
 
         if (end_cycle < 0) begin
-            $display("FAIL: throughput run timed out input=%0d output=%0d",
-                     input_count, output_count);
-            $display("DEBUG: commands=%0d backend_active=%0d backend_tile=(%0d,%0d) row=%0d beat=%0d cmd_addr=%h reader_state=%0d cache_state=%0d",
-                     command_count, backend_active, backend_tx, backend_ty,
-                     backend_row, backend_beat, rd_cmd_addr,
-                     dut.burst_reader_inst.state, dut.tile_cache_inst.state);
-            $display("DEBUG: rd_valid=%0d rd_ready=%0d fill_valid=%0d fill_ready=%0d beat=%0d row=%0d",
-                     rd_data_valid, rd_data_ready,
-                     dut.reader_fill_data_valid, dut.reader_fill_data_ready,
-                     dut.reader_fill_beat_index, dut.reader_fill_row_index);
+            $display("FAIL: 1080p30 run timed out input=%0d output=%0d commands=%0d",
+                     input_count, output_count, command_count);
             errors = errors + 1;
-        end else if (output_count != PIXELS) begin
-            $display("FAIL: expected %0d outputs, got %0d", PIXELS, output_count);
+        end else if (input_count != PIXELS || output_count != PIXELS) begin
+            $display("FAIL: expected %0d input/output pixels, got %0d/%0d",
+                     PIXELS, input_count, output_count);
             errors = errors + 1;
-        end else if ((end_cycle - start_cycle + 1) > PIXELS * 2) begin
-            $display("FAIL: hit-stream throughput exceeded two cycles per pixel: %0d cycles",
+        end else if ((end_cycle - start_cycle + 1) > FRAME_BUDGET) begin
+            $display("FAIL: frame budget exceeded: %0d cycles",
                      end_cycle - start_cycle + 1);
             errors = errors + 1;
         end
 
         if (errors != 0)
-            $fatal(1, "TEST_FAIL: cached_pixel_fetch_throughput errors=%0d", errors);
+            $fatal(1, "TEST_FAIL: 1080p30_throughput errors=%0d", errors);
 
-        $display("THROUGHPUT_RESULT: pixels=%0d frame_cycles=%0d commands=%0d cycles_per_pixel=%f",
+        $display("THROUGHPUT_1080P30_RESULT: pixels=%0d frame_cycles=%0d commands=%0d cycles_per_pixel=%f",
                  PIXELS, end_cycle - start_cycle + 1, command_count,
                  (end_cycle - start_cycle + 1) * 1.0 / PIXELS);
-        $display("TEST_PASS: cached_pixel_fetch_throughput");
+        $display("TEST_PASS: 1080p30_throughput");
         $finish;
     end
 endmodule

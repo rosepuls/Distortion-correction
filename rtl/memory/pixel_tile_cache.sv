@@ -97,6 +97,11 @@ module pixel_tile_cache #(
     reg [PIXEL_WIDTH-1:0] pixel_p01_comb;
     reg [PIXEL_WIDTH-1:0] pixel_p11_comb;
 
+    wire lookup_coord_valid_comb = (lookup_x_reg < IMAGE_WIDTH - 1)
+                                   && (lookup_y_reg < IMAGE_HEIGHT - 1);
+    wire lookup_response_ready = lookup_rsp_ready
+                                  && (all_required_hit || !lookup_coord_valid_comb);
+
     function automatic integer tile_set_index(
         input integer tile_x,
         input integer tile_y
@@ -216,7 +221,7 @@ module pixel_tile_cache #(
         pixel_p10_comb = {PIXEL_WIDTH{1'b0}};
         pixel_p01_comb = {PIXEL_WIDTH{1'b0}};
         pixel_p11_comb = {PIXEL_WIDTH{1'b0}};
-        if (coord_valid_reg && all_required_hit) begin
+        if (lookup_coord_valid_comb && all_required_hit) begin
             pixel_p00_comb = read_pixel_word(
                 lookup_x_reg, lookup_y_reg,
                 required_tile_x[0], required_tile_y[0], required_way[0]
@@ -251,14 +256,18 @@ module pixel_tile_cache #(
         end
     endtask
 
-    assign lookup_ready = (state == STATE_IDLE) && rst_n;
-    assign lookup_rsp_valid = (state == STATE_RESPONSE);
+    assign lookup_ready = rst_n
+                          && ((state == STATE_IDLE)
+                              || ((state == STATE_CHECK) && lookup_response_ready));
+    assign lookup_rsp_valid = (state == STATE_RESPONSE)
+                              || ((state == STATE_CHECK)
+                                  && (all_required_hit || !lookup_coord_valid_comb));
     assign pixel_p00 = pixel_p00_comb;
     assign pixel_p10 = pixel_p10_comb;
     assign pixel_p01 = pixel_p01_comb;
     assign pixel_p11 = pixel_p11_comb;
-    assign cache_hit = lookup_rsp_valid && coord_valid_reg;
-    assign coord_valid = coord_valid_reg;
+    assign cache_hit = lookup_rsp_valid && lookup_coord_valid_comb && all_required_hit;
+    assign coord_valid = lookup_rsp_valid && lookup_coord_valid_comb && all_required_hit;
 
     assign fill_req_valid = (state == STATE_FILL_REQ);
     assign fill_tile_x = pending_tile_x;
@@ -308,7 +317,16 @@ module pixel_tile_cache #(
                     if ((lookup_x_reg >= IMAGE_WIDTH - 1)
                         || (lookup_y_reg >= IMAGE_HEIGHT - 1)) begin
                         coord_valid_reg <= 1'b0;
-                        state <= STATE_RESPONSE;
+                        if (lookup_response_ready) begin
+                            if (lookup_valid && lookup_ready) begin
+                                lookup_x_reg <= lookup_x0;
+                                lookup_y_reg <= lookup_y0;
+                                coord_valid_reg <= 1'b0;
+                                state <= STATE_CHECK;
+                            end else begin
+                                state <= STATE_IDLE;
+                            end
+                        end
                     end else if (all_required_hit) begin
                         coord_valid_reg <= 1'b1;
                         for (tile_cursor = 0; tile_cursor < 4; tile_cursor = tile_cursor + 1)
@@ -320,7 +338,16 @@ module pixel_tile_cache #(
                                     ),
                                     required_way[tile_cursor]
                                 );
-                        state <= STATE_RESPONSE;
+                        if (lookup_response_ready) begin
+                            if (lookup_valid && lookup_ready) begin
+                                lookup_x_reg <= lookup_x0;
+                                lookup_y_reg <= lookup_y0;
+                                coord_valid_reg <= 1'b0;
+                                state <= STATE_CHECK;
+                            end else begin
+                                state <= STATE_IDLE;
+                            end
+                        end
                     end else begin
                         pending_tile_x <= missing_tile_x;
                         pending_tile_y <= missing_tile_y;
