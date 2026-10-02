@@ -191,6 +191,15 @@ rsp_valid && rsp_ready
 
 第一版行为模型规定响应顺序与请求接受顺序一致。以后若允许乱序返回，必须增加事务标签，不能依赖隐含顺序。
 
+冻结的第一版协议合同如下：
+
+```text
+req_addr = y * FRAME_STRIDE_PIXELS + x
+request_accept = req_valid && req_ready
+response_accept = rsp_valid && rsp_ready
+response order = request acceptance order
+```
+
 ### 7.3 视频连续性要求
 
 真实输出视频不能等待 DDR，因此可变延迟接口不能直接连接 HDMI 输出。最终系统需要至少一种机制：

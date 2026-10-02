@@ -30,6 +30,11 @@ module tb_bilinear_interp;
             p00 = a; p10 = b; p01 = c; p11 = d; dx = fx; dy = fy;
             coord_valid = coordinate_ok; in_valid = 1'b1; in_sof=sof; in_eol=eol;
             @(negedge clk);
+            if (out_valid !== 1'b0 || out_sof !== 1'b0 || out_eol !== 1'b0) begin
+                $display("TEST_FAIL: bilinear_interp must not produce data before its second pipeline stage");
+                errors = errors + 1;
+            end
+            @(negedge clk);
             if (!out_valid || out_pixel !== expected || out_sof!==sof || out_eol!==eol) begin
                 $display("TEST_FAIL: bilinear_interp got=%h expected=%h", out_pixel, expected);
                 errors = errors + 1;

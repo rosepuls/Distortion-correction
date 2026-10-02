@@ -260,6 +260,33 @@ x = (u-cx) × inv_fx
 y = (v-cy) × inv_fy
 ```
 
+---
+
+## 7. Pixel Fetch 逻辑地址与无板卡基线
+
+Pixel Fetch 的算法层地址统一使用逻辑像素编号，不直接使用 DDR 字节地址：
+
+```text
+req_addr = y × FRAME_STRIDE_PIXELS + x
+```
+
+RGB888 的一个逻辑像素占 3 个字节，但地址模型中的相邻地址仍表示相邻逻辑像素。RGB
+物理打包、DDR 数据位宽、突发拆分和 PHY 时序属于板级存储适配层，不能混入坐标或缓存
+算法的地址计算。
+
+双线性四邻域只有在以下条件同时满足时才允许发起内存请求：
+
+```text
+0 <= x0 < IMAGE_WIDTH - 1
+0 <= y0 < IMAGE_HEIGHT - 1
+```
+
+当 `coord_valid=0` 时，Pixel Fetch 必须不发请求并输出黑色 RGB；`sof/eol/valid` 仍需与
+该黑色输出保持对齐。当前无板卡功能引擎一次只处理一个坐标事务，采用
+`P00 → response → P10 → response → P01 → response → P11 → response` 的保守时序，
+因此不能据此宣称满足 1280×720@60 fps。最终吞吐需要 Local Pixel Cache、预取、FIFO 或
+调度器，并必须在真实 DDR/板卡约束下重新验证。
+
 每个乘法节点先保留完整理论位宽。具体缩位位置必须由 Python 范围扫描与误差报告决定，并记录到本文件的后续版本中。
 
 ### 6.1 当前基准 RTL 契约

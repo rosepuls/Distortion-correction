@@ -112,6 +112,16 @@ xelab -debug typical tb_bilinear_interp -s tb_bilinear_interp_sim
 xsim tb_bilinear_interp_sim -runall
 ```
 
+### pixel_fetch_bilinear
+
+```powershell
+xvlog -sv rtl\interpolation\bilinear_interp.sv rtl\memory\pixel_fetch_if.sv rtl\memory\pixel_fetch_engine.sv sim\models\ddr_behavior_model.sv sim\tb_pixel_fetch_bilinear.sv
+xelab -debug typical tb_pixel_fetch_bilinear -s tb_pixel_fetch_bilinear_sim
+xsim tb_pixel_fetch_bilinear_sim -runall
+```
+
+该测试验证 `P00/P10/P01/P11` 请求顺序、单请求响应握手、RGB888 双线性结果、无效边界坐标不发请求，以及 `sof/eol` 控制信号对齐。
+
 ### line_ram_1r1w
 
 ```powershell

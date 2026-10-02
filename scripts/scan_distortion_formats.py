@@ -161,8 +161,27 @@ def write_q18_vectors(path: Path, width: int = 1280, height: int = 720) -> None:
 
     points = ((0, 0, 1, 0), (width - 1, 0, 0, 0), (0, height - 1, 0, 0),
               (width - 1, height - 1, 0, 1), (width // 2, height // 2, 0, 0))
+    vector_cameras = list(CAMERAS.items()) + [
+        (
+            "overflow_guard",
+            dict(fx=900.0, fy=900.0, cx=4095.0, cy=359.5),
+        ),
+        (
+            "image_regression",
+            dict(
+                fx=180.0,
+                fy=180.0,
+                cx=127.5,
+                cy=95.5,
+                k1=-0.25,
+                k2=0.05,
+                p1=0.001,
+                p2=-0.001,
+            ),
+        ),
+    ]
     lines = ["# u v sof eol cfg_id src_x_q19 src_y_q19 x0 y0 dx_q16 dy_q16 coord_valid"]
-    for cfg_id, (_, parameters) in enumerate(CAMERAS.items()):
+    for cfg_id, (_, parameters) in enumerate(vector_cameras):
         camera = model.FixedPointCameraModel.from_parameters(**parameters)
         for u, v, sof, eol in points:
             source_x, source_y = model.source_coordinates_horner_quantized(

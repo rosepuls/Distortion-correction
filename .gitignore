@@ -36,6 +36,23 @@ pds/*/multiseed_summary.csv
 pds/*/pds.log
 pds/*/run.log
 
+# Official PDS reference-project generated outputs
+board_reference/**/compile/
+board_reference/**/device_map/
+board_reference/**/generate_bitstream/
+board_reference/**/log/
+board_reference/**/logbackup/
+board_reference/**/place_route/
+board_reference/**/report_timing/
+board_reference/**/synthesize/
+board_reference/**/*.pds.lock
+
+# PDS lock files
+*.pds.lock
+
+# Editor backup files
+*~
+
 # Local test-runner cache
 .pytest_cache/
 pytest-cache-files-*/
