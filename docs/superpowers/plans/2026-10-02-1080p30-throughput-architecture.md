@@ -4,7 +4,7 @@
 
 **Goal:** Replace the current four-single-pixel DDR read path with a measurable 1080P30 RGBX8888 burst and Tile Cache pipeline that can sustain the complete 1920×1080 raster at a 100 MHz algorithm clock.
 
-**Architecture:** The work is split into three independently testable layers. First, the software model becomes a full-raster physical DDR traffic model. Second, vendor-neutral RTL implements a 512-entry coordinate FIFO boundary, a 32×4 four-way Tile Cache, and a four-bank 2×2 neighborhood path. Third, the PGL50H board wrapper adopts RGBX8888 Ping-Pong frame buffers and 1080P30 video timing. The legacy single-pixel path remains available for functional regression until the cached path passes image and throughput tests.
+**Architecture:** The work is split into three independently testable layers. First, the software model becomes a full-raster physical DDR traffic model. Second, vendor-neutral RTL implements a 512-entry coordinate FIFO boundary, a 32×4 eight-way skewed-index Tile Cache, and a four-bank 2×2 neighborhood path. Third, the PGL50H board wrapper adopts RGBX8888 Ping-Pong frame buffers and 1080P30 video timing. The legacy single-pixel path remains available for functional regression until the cached path passes image and throughput tests.
 
 **Tech Stack:** Python 3, `unittest`, NumPy, SystemVerilog, existing DDR behavior model, PDS-generated DDR3/PLL IP, MES50HP vendor RTL, PowerShell simulation runners.
 
@@ -13,7 +13,7 @@
 - Formal target is `1920×1080 @ 30 fps`; 1080P60 is out of scope for this milestone.
 - Algorithm and DDR user logic target is 100 MHz; frame budget is 3,333,333 cycles and average budget is 1.607 cycles/pixel.
 - Real-time frame storage format is RGBX8888; one DDR data beat is 256 bit and contains eight pixels.
-- First Tile Cache configuration is 32×4 pixels, 128 resident Tiles, 32 sets × 4 ways, four data banks, and four 256-bit beats per Tile row.
+- First Tile Cache configuration is 32×4 pixels, 128 resident Tiles, 16 sets × 8 ways with `tile_x - tile_y + (tile_x >> 2)` skewed indexing, four data banks, and four 256-bit beats per Tile row.
 - Invalid source coordinates produce black output without a DDR request.
 - The official DDR3/HDMI vendor files are integration dependencies and are not reformatted.
 - Generated PDS compile, place-route, timing, and bitstream directories remain ignored by Git.
@@ -41,14 +41,15 @@
 ```python
 def test_tile_cache_uses_rgbx8888_and_four_beat_row_bursts(self):
     config = CacheConfig(
-        "tile_32x4_128_4way",
+        "tile_32x4_128_8way_skewed",
         tile_width=32,
         tile_height=4,
-        burst_length=8,
-        set_count=32,
-        ways=4,
+        burst_length=32,
+        set_count=16,
+        ways=8,
         pixel_bytes=4,
-        burst_beats=1,
+        burst_beats=4,
+        set_hash="skewed_x_minus_y",
     )
     metrics = simulate_cache(self.requests, 64, 8, config)
     self.assertEqual(metrics.ddr_bursts % 4, 0)
@@ -67,7 +68,7 @@ Expected: the new configuration fields or full-raster report behavior are missin
 
 - [ ] **Step 3: Implement set-associative Tile accounting.**
 
-Use `(tile_y * tiles_per_row + tile_x) % set_count` as the deterministic set index, store up to `ways` tags per set, and count a miss once per aligned Tile rather than once per neighbor. A 32×4 RGBX8888 Tile loads four row bursts of eight pixels per burst, so its physical load is `32 * 4 * 4 = 512` bytes and 16 256-bit beats.
+Use `tile_x - tile_y + (tile_x >> 2)` modulo `set_count` as the deterministic skewed set index, store up to `ways` tags per set, and count a miss once per aligned Tile rather than once per neighbor. A 32×4 RGBX8888 Tile loads four row bursts of four 256-bit beats, so its physical load is `32 * 4 * 4 = 512` bytes and 16 256-bit beats.
 
 - [ ] **Step 4: Replace sparse report generation with complete 1920×1080 raster evaluation.**
 
@@ -212,7 +213,7 @@ git add rtl/memory/ddr_burst_reader.sv sim/tb_ddr_burst_reader.sv sim/run_ddr_bu
 git commit -m "feat: add four-beat DDR Tile burst reader"
 ```
 
-### Task 5: Implement the four-way, four-bank Tile Cache
+### Task 5: Implement the eight-way, four-bank Tile Cache
 
 **Files:**
 - Create: `rtl/memory/pixel_tile_cache.sv`
@@ -225,11 +226,11 @@ git commit -m "feat: add four-beat DDR Tile burst reader"
 - Lookup response: `lookup_rsp_valid`, `lookup_rsp_ready`, four `pixel_*[31:0]`, `cache_hit`, `coord_valid`.
 - Fill request: `fill_req_valid`, `fill_req_ready`, `fill_tile_x`, `fill_tile_y`, `fill_row_index`.
 - Fill data: `fill_data_valid`, `fill_data_ready`, `fill_data[255:0]`, `fill_row_index`, `fill_beat_index`.
-- Parameters: `IMAGE_WIDTH=1920`, `IMAGE_HEIGHT=1080`, `TILE_W=32`, `TILE_H=4`, `SET_COUNT=32`, `WAYS=4`.
+- Parameters: `IMAGE_WIDTH=1920`, `IMAGE_HEIGHT=1080`, `TILE_W=32`, `TILE_H=4`, `SET_COUNT=16`, `WAYS=8`.
 
 - [ ] **Step 1: Write failing hit, miss, replacement, and four-bank tests.**
 
-The testbench shall fill a known Tile, query an interior coordinate, query a 2×2 neighborhood crossing an x boundary, fill five tags mapping to one set, and verify pseudo-LRU replacement does not evict the most recently used tag.
+The testbench shall fill a known Tile, query an interior coordinate, query a 2×2 neighborhood crossing an x boundary, fill nine tags mapping to one set, and verify pseudo-LRU replacement does not evict the most recently used tag.
 
 - [ ] **Step 2: Run the cache testbench and confirm the implementation is absent.**
 
@@ -239,7 +240,7 @@ powershell -ExecutionPolicy Bypass -File sim/run_pixel_tile_cache.ps1
 
 - [ ] **Step 3: Implement Tag arrays and replacement state.**
 
-Compute `tile_x=x0[11:5]`, `tile_y=y0[11:2]`, set index `(tile_y * 60 + tile_x) % 32`, and compare all four ways in parallel. A query that touches multiple Tiles must report all required Tags before asserting `lookup_rsp_valid`.
+Compute `tile_x=x0[11:5]`, `tile_y=y0[11:2]`, set index `(tile_x - tile_y + (tile_x >> 2)) % 16`, and compare all eight ways in parallel. A query that touches multiple Tiles must report all required Tags before asserting `lookup_rsp_valid`.
 
 - [ ] **Step 4: Implement four parity banks and line unpacking.**
 
@@ -253,7 +254,7 @@ Expected: a hit returns all four correct pixels in one response handshake; a mis
 
 ```powershell
 git add rtl/memory/pixel_tile_cache.sv rtl/memory/pixel_fetch_if.sv sim/tb_pixel_tile_cache.sv sim/run_pixel_tile_cache.ps1
-git commit -m "feat: add four-bank RGBX Tile Cache"
+git commit -m "feat: add eight-way RGBX Tile Cache"
 ```
 
 ### Task 6: Integrate cached Pixel Fetch with the existing bilinear path

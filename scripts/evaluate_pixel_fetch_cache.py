@@ -1,4 +1,4 @@
-"""Evaluate deterministic cache policies on sampled 720P distortion traces."""
+"""Evaluate deterministic cache policies on a 1080P30 distortion raster."""
 
 from __future__ import annotations
 
@@ -19,13 +19,36 @@ from bitaccurate_distortion import (
     source_coordinates_fixed,
     split_source_coordinates,
 )
-from cache_model import NO_CACHE, ROW_WINDOW, TILE_16X4, CacheConfig, simulate_cache
+from cache_model import (
+    NO_CACHE,
+    ROW_WINDOW,
+    TILE_16X4,
+    CacheConfig,
+    simulate_cache,
+)
 
 
-WIDTH = 1280
-HEIGHT = 720
+WIDTH = 1920
+HEIGHT = 1080
+FPS = 30
 RASTER_STRIDE = 8
-POLICIES: tuple[CacheConfig, ...] = (NO_CACHE, ROW_WINDOW, TILE_16X4)
+TILE_32X4_128_8WAY_SKEWED = CacheConfig(
+    "tile_32x4_128_8way_skewed",
+    tile_width=32,
+    tile_height=4,
+    burst_length=32,
+    set_count=16,
+    ways=8,
+    pixel_bytes=4,
+    burst_beats=4,
+    set_hash="skewed_x_minus_y",
+)
+POLICIES: tuple[CacheConfig, ...] = (
+    NO_CACHE,
+    ROW_WINDOW,
+    TILE_16X4,
+    TILE_32X4_128_8WAY_SKEWED,
+)
 
 
 def sampled_output_coordinates(
@@ -74,15 +97,34 @@ def sampled_output_coordinates(
     return coordinates[:, 0], coordinates[:, 1]
 
 
+def raster_output_coordinates(
+    width: int,
+    height: int,
+    *,
+    full_raster: bool,
+    stride: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    if full_raster:
+        output_y, output_x = np.indices((height, width), dtype=np.int64)
+        return output_x.ravel(), output_y.ravel()
+    return sampled_output_coordinates(width, height, stride)
+
+
 def evaluate_camera(
     name: str,
     camera: FixedPointCameraModel,
     *,
     width: int = WIDTH,
     height: int = HEIGHT,
+    full_raster: bool = True,
     stride: int = RASTER_STRIDE,
 ) -> list[tuple[str, object, object]]:
-    output_x, output_y = sampled_output_coordinates(width, height, stride)
+    output_x, output_y = raster_output_coordinates(
+        width,
+        height,
+        full_raster=full_raster,
+        stride=stride,
+    )
     source_x, source_y = source_coordinates_fixed(output_x, output_y, camera)
     x0, y0, _dx, _dy, coord_valid = split_source_coordinates(
         source_x, source_y, width=width, height=height
@@ -104,13 +146,23 @@ def evaluate_camera(
     ]
 
 
-def build_report(width: int = WIDTH, height: int = HEIGHT, stride: int = RASTER_STRIDE) -> str:
+def build_report(
+    width: int = WIDTH,
+    height: int = HEIGHT,
+    fps: int = FPS,
+    full_raster: bool = True,
+    stride: int = RASTER_STRIDE,
+) -> str:
+    if width <= 0 or height <= 0 or fps <= 0:
+        raise ValueError("width, height, and fps must be positive")
+    focal_scale = width / 1280.0
+    focal_length = 900.0 * focal_scale
     cameras = (
         (
             "identity",
             FixedPointCameraModel.from_parameters(
-                fx=900.0,
-                fy=900.0,
+                fx=focal_length,
+                fy=focal_length,
                 cx=(width - 1) / 2.0,
                 cy=(height - 1) / 2.0,
             ),
@@ -118,8 +170,8 @@ def build_report(width: int = WIDTH, height: int = HEIGHT, stride: int = RASTER_
         (
             "barrel",
             FixedPointCameraModel.from_parameters(
-                fx=900.0,
-                fy=900.0,
+                fx=focal_length,
+                fy=focal_length,
                 cx=(width - 1) / 2.0,
                 cy=(height - 1) / 2.0,
                 k1=-0.25,
@@ -131,8 +183,8 @@ def build_report(width: int = WIDTH, height: int = HEIGHT, stride: int = RASTER_
         (
             "pincushion",
             FixedPointCameraModel.from_parameters(
-                fx=900.0,
-                fy=900.0,
+                fx=focal_length,
+                fy=focal_length,
                 cx=(width - 1) / 2.0,
                 cy=(height - 1) / 2.0,
                 k1=0.15,
@@ -145,45 +197,47 @@ def build_report(width: int = WIDTH, height: int = HEIGHT, stride: int = RASTER_
 
     rows: list[tuple[str, object, object]] = []
     for name, camera in cameras:
-        rows.extend(evaluate_camera(name, camera, width=width, height=height, stride=stride))
+        rows.extend(
+            evaluate_camera(
+                name,
+                camera,
+                width=width,
+                height=height,
+                full_raster=full_raster,
+                stride=stride,
+            )
+        )
 
-    sampled_count = len(sampled_output_coordinates(width, height, stride)[0])
-    identity_row_window = next(
-        metrics
-        for camera_name, _trace_metrics, metrics in rows
-        if camera_name == "identity" and metrics.policy == "row_window"
+    output_count = len(
+        raster_output_coordinates(
+            width,
+            height,
+            full_raster=full_raster,
+            stride=stride,
+        )[0]
     )
-    full_valid_outputs = max(0, (width - 1) * (height - 1))
-    estimated_frame_bytes = round(
-        identity_row_window.ddr_read_bytes
-        / identity_row_window.output_requests
-        * full_valid_outputs
-    )
-    estimated_bandwidth_bps = estimated_frame_bytes * 60
+    frame_stream_bytes = width * height * 4 * 4
     lines = [
         "# Pixel Fetch Cache Summary",
         "",
-        "This report is a deterministic logical-pixel model estimate, not a board measurement.",
-        "It uses RGB888 (3 bytes per logical source pixel), a 1280×720 frame, raster stride 8,",
-        "and every border coordinate. DDR byte packing, controller scheduling, and PHY overhead",
-        "are intentionally outside this pre-study.",
+        "This report is a deterministic full-raster physical-traffic model, not a board measurement.",
+        "It uses RGBX8888 source pixels, 256-bit DDR beats, set-associative Tile Cache accounting,",
+        "and does not claim DDR controller or PHY efficiency.",
         "",
-        f"- sampled output coordinates: `{sampled_count}`",
+        f"- output coordinates evaluated: `{output_count}`",
         f"- image size: `{width}×{height}`",
-        f"- raster stride: `{stride}`",
+        f"- frame rate: `{fps} fps`",
+        f"- raster: `{'full' if full_raster else f'stride-{stride}'}`",
         "- valid source coordinates use the four-neighbor policy `0 <= x0 < width-1` and `0 <= y0 < height-1`.",
+        f"- four frame-equivalent RGBX streams: `{frame_stream_bytes}` bytes/frame, `{frame_stream_bytes * fps}` bytes/s.",
         "",
-        "## First RTL cache candidate",
+        "## Cache candidates",
         "",
-        "The first candidate for RTL prototyping is `row_window`: an aligned 4×2 pixel region,",
-        "burst length 4, and 8 logical RGB888 pixels of modeled capacity. Based on the sampled",
-        f"identity trace, the proportional full-frame estimate is `{estimated_frame_bytes}` bytes/frame",
-        f"or `{estimated_bandwidth_bps}` bytes/s at 60 fps. This is an extrapolated model estimate,",
-        "not a board measurement; the sparse trace and one-region policy must be re-evaluated with",
-        "a full raster trace before freezing DDR bandwidth claims.",
+        "`tile_32x4_128_8way_skewed` is the 1080P30 RTL candidate. Its physical source traffic is measured",
+        "directly from the complete raster rather than extrapolated from stride sampling.",
         "",
-        "| camera | policy | output requests | source pixel requests | cache hit rate | DDR read bytes | DDR bursts | average burst length | cache capacity (pixels) |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| camera | policy | output requests | source pixel requests | cache hit rate | DDR read bytes | DDR bursts | DDR beats | average burst length (pixels) | average burst (beats) | cache capacity (pixels) |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for camera_name, _trace_metrics, metrics in rows:
         lines.append(
@@ -191,7 +245,9 @@ def build_report(width: int = WIDTH, height: int = HEIGHT, stride: int = RASTER_
             f"{camera_name} | {metrics.policy} | {metrics.output_requests} | "
             f"{metrics.source_pixel_requests} | {metrics.cache_hit_rate:.6f} | "
             f"{metrics.ddr_read_bytes} | {metrics.ddr_bursts} | "
-            f"{metrics.average_burst_length:.6f} | {metrics.cache_capacity_pixels} |"
+            f"{metrics.ddr_beats} | {metrics.average_burst_length:.6f} | "
+            f"{metrics.average_burst_beats:.6f} | "
+            f"{metrics.cache_capacity_pixels} |"
         )
 
     lines.extend(
@@ -199,10 +255,9 @@ def build_report(width: int = WIDTH, height: int = HEIGHT, stride: int = RASTER_
             "",
             "## Interpretation",
             "",
-            "`no_cache` is a lower-complexity traffic baseline with no reuse. `row_window` and",
-            "`tile_16x4` load one aligned in-bounds region on a miss and retain only that region.",
-            "The estimates are intended to choose a first cache architecture before DDR3 and",
-            "board measurements are available.",
+            "`no_cache` is a lower-complexity traffic baseline with no reuse. The candidate cache",
+            "loads one aligned 32×4 RGBX region on a miss and retains eight ways per set.",
+            "DDR controller scheduling, read/write arbitration, and board measurements remain separate.",
             "",
         )
     )
@@ -212,9 +267,24 @@ def build_report(width: int = WIDTH, height: int = HEIGHT, stride: int = RASTER_
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--width", type=int, default=WIDTH)
+    parser.add_argument("--height", type=int, default=HEIGHT)
+    parser.add_argument("--fps", type=int, default=FPS)
+    parser.add_argument("--stride", type=int, default=RASTER_STRIDE)
+    parser.add_argument("--sampled", action="store_true")
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(build_report() + "\n", encoding="utf-8")
+    args.output.write_text(
+        build_report(
+            width=args.width,
+            height=args.height,
+            fps=args.fps,
+            full_raster=not args.sampled,
+            stride=args.stride,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return 0
 
 
