@@ -37,7 +37,7 @@ Get-Command xvlog, xelab, xsim
 以 `rgb2gray` 为例，逐行复制执行：
 
 ```powershell
-xvlog -sv rtl\preprocess\rgb2gray.sv sim\tb_rgb2gray.sv
+xvlog -sv rtl\algorithm\preprocess\rgb2gray.sv sim\tb_rgb2gray.sv
 xelab -debug typical tb_rgb2gray -s tb_rgb2gray_sim
 xsim tb_rgb2gray_sim -runall
 ```
@@ -57,7 +57,7 @@ TEST_PASS: rgb2gray
 ### brightness_gain
 
 ```powershell
-xvlog -sv rtl\preprocess\brightness_gain.sv sim\tb_brightness_gain.sv
+xvlog -sv rtl\algorithm\preprocess\brightness_gain.sv sim\tb_brightness_gain.sv
 xelab -debug typical tb_brightness_gain -s tb_brightness_gain_sim
 xsim tb_brightness_gain_sim -runall
 ```
@@ -65,7 +65,7 @@ xsim tb_brightness_gain_sim -runall
 ### gamma_lut
 
 ```powershell
-xvlog -sv rtl\preprocess\gamma_lut.sv sim\tb_gamma_lut.sv
+xvlog -sv rtl\algorithm\preprocess\gamma_lut.sv sim\tb_gamma_lut.sv
 xelab -debug typical tb_gamma_lut -s tb_gamma_lut_sim
 xsim tb_gamma_lut_sim -runall
 ```
@@ -73,7 +73,7 @@ xsim tb_gamma_lut_sim -runall
 ### bilinear_interp
 
 ```powershell
-xvlog -sv rtl\interpolation\bilinear_interp.sv sim\tb_bilinear_interp.sv
+xvlog -sv rtl\algorithm\interpolation\bilinear_interp.sv sim\tb_bilinear_interp.sv
 xelab -debug typical tb_bilinear_interp -s tb_bilinear_interp_sim
 xsim tb_bilinear_interp_sim -runall
 ```
@@ -81,7 +81,7 @@ xsim tb_bilinear_interp_sim -runall
 ### line_ram_1r1w
 
 ```powershell
-xvlog -sv rtl\preprocess\line_ram_1r1w.sv sim\tb_line_ram_1r1w.sv
+xvlog -sv rtl\algorithm\preprocess\line_ram_1r1w.sv sim\tb_line_ram_1r1w.sv
 xelab -debug typical tb_line_ram_1r1w -s tb_line_ram_1r1w_sim
 xsim tb_line_ram_1r1w_sim -runall
 ```
@@ -89,7 +89,7 @@ xsim tb_line_ram_1r1w_sim -runall
 ### line_buffer_3x3
 
 ```powershell
-xvlog -sv rtl\preprocess\line_ram_1r1w.sv rtl\preprocess\line_buffer_3x3.sv sim\tb_line_buffer_3x3.sv
+xvlog -sv rtl\algorithm\preprocess\line_ram_1r1w.sv rtl\algorithm\preprocess\line_buffer_3x3.sv sim\tb_line_buffer_3x3.sv
 xelab -debug typical tb_line_buffer_3x3 -s tb_line_buffer_3x3_sim
 xsim tb_line_buffer_3x3_sim -runall
 ```
@@ -97,7 +97,7 @@ xsim tb_line_buffer_3x3_sim -runall
 ### window_3x3
 
 ```powershell
-xvlog -sv rtl\preprocess\window_3x3.sv sim\tb_window_3x3.sv
+xvlog -sv rtl\algorithm\preprocess\window_3x3.sv sim\tb_window_3x3.sv
 xelab -debug typical tb_window_3x3 -s tb_window_3x3_sim
 xsim tb_window_3x3_sim -runall
 ```
@@ -105,7 +105,7 @@ xsim tb_window_3x3_sim -runall
 ### gaussian_3x3
 
 ```powershell
-xvlog -sv rtl\preprocess\gaussian_3x3.sv sim\tb_gaussian_3x3.sv
+xvlog -sv rtl\algorithm\preprocess\gaussian_3x3.sv sim\tb_gaussian_3x3.sv
 xelab -debug typical tb_gaussian_3x3 -s tb_gaussian_3x3_sim
 xsim tb_gaussian_3x3_sim -runall
 ```
@@ -113,7 +113,7 @@ xsim tb_gaussian_3x3_sim -runall
 ### sobel_3x3
 
 ```powershell
-xvlog -sv rtl\detect\sobel_3x3.sv sim\tb_sobel_3x3.sv
+xvlog -sv rtl\algorithm\detect\sobel_3x3.sv sim\tb_sobel_3x3.sv
 xelab -debug typical tb_sobel_3x3 -s tb_sobel_3x3_sim
 xsim tb_sobel_3x3_sim -runall
 ```
@@ -121,7 +121,7 @@ xsim tb_sobel_3x3_sim -runall
 ### threshold
 
 ```powershell
-xvlog -sv rtl\detect\threshold.sv sim\tb_threshold.sv
+xvlog -sv rtl\algorithm\detect\threshold.sv sim\tb_threshold.sv
 xelab -debug typical tb_threshold -s tb_threshold_sim
 xsim tb_threshold_sim -runall
 ```
@@ -129,7 +129,7 @@ xsim tb_threshold_sim -runall
 ### morphology
 
 ```powershell
-xvlog -sv rtl\detect\morphology.sv sim\tb_morphology.sv
+xvlog -sv rtl\algorithm\detect\morphology.sv sim\tb_morphology.sv
 xelab -debug typical tb_morphology -s tb_morphology_sim
 xsim tb_morphology_sim -runall
 ```

@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$topPath = Join-Path $projectRoot "rtl/board/mes50hp/pgl50h_board_top.sv"
-$fdcPath = Join-Path $projectRoot "constraints/mes50hp/pgl50h_board_top.fdc"
+$topPath = Join-Path $projectRoot "rtl/board/pgl50h/pgl50h_board_top.sv"
+$fdcPath = Join-Path $projectRoot "boards/pgl50h/constraints/pgl50h_board_top.fdc"
 
 if (-not (Test-Path -LiteralPath $topPath)) {
     throw "Missing board top: $topPath"
@@ -63,8 +63,8 @@ foreach ($fragment in $requiredStatusIo) {
 $requiredIp = @(
     "ip/pango/mes50hp_video_pll/pll.idf",
     "ip/pango/DDR3_50H/DDR3_50H.idf",
-    "rtl/vendor/mes50hp/ddr/wr_fram_buf/wr_fram_buf.idf",
-    "rtl/vendor/mes50hp/ddr/rd_fram_buf/rd_fram_buf.idf"
+    "rtl/vendor/pgl50h/ddr/wr_fram_buf/wr_fram_buf.idf",
+    "rtl/vendor/pgl50h/ddr/rd_fram_buf/rd_fram_buf.idf"
 )
 foreach ($relativePath in $requiredIp) {
     $absolutePath = Join-Path $projectRoot $relativePath

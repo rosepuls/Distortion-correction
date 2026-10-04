@@ -42,6 +42,36 @@ module wr_buf #(
     assign ddr_wdata='0; assign frame_wcnt='0; assign frame_wirq=1'b0;
 endmodule
 
+// Behavioral stand-in for the generated Pango 32-bit-write / 256-bit-read
+// line-buffer IP.  Board structural tests use this only when the RGBX writer
+// selects its hardware branch; PDS imports the generated wr_fram_buf IP.
+module wr_fram_buf (
+    input wire [31:0] wr_data,
+    input wire [11:0] wr_addr,
+    input wire wr_en,
+    input wire wr_clk,
+    input wire wr_rst,
+    output reg [255:0] rd_data,
+    input wire [8:0] rd_addr,
+    input wire rd_clk,
+    input wire rd_rst
+);
+    reg [31:0] mem [0:4095];
+    integer lane;
+    always @(posedge wr_clk) begin
+        if (wr_en)
+            mem[wr_addr] <= wr_data;
+    end
+    always @(posedge rd_clk) begin
+        if (rd_rst)
+            rd_data <= 256'd0;
+        else begin
+            for (lane = 0; lane < 8; lane = lane + 1)
+                rd_data[lane*32 +: 32] <= mem[{rd_addr, 3'b000} + lane];
+        end
+    end
+endmodule
+
 module wr_rd_ctrl_top #(
     parameter CTRL_ADDR_WIDTH=28, parameter MEM_DQ_WIDTH=32
 ) (

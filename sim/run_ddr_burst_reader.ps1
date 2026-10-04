@@ -7,7 +7,7 @@ New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 Push-Location $runDirectory
 try {
     & xvlog -sv `
-        (Join-Path $projectRoot 'rtl\memory\ddr_burst_reader.sv') `
+        (Join-Path $projectRoot 'rtl\platform\common\memory\ddr_burst_reader.sv') `
         (Join-Path $projectRoot 'sim\tb_ddr_burst_reader.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

@@ -6,8 +6,8 @@ back into their frame-parameter source registers.
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$formalPvf = Join-Path $projectRoot "pds\pgl50h_rtl_synth\synthesize\formal.pvf"
-$pnrNetlist = Join-Path $projectRoot "pds\pgl50h_rtl_synth\place_route\pgl50h_board_top_pnr.netlist"
+$formalPvf = Join-Path $projectRoot "boards\pgl50h\pds\pgl50h_rtl_synth\synthesize\formal.pvf"
+$pnrNetlist = Join-Path $projectRoot "boards\pgl50h\pds\pgl50h_rtl_synth\place_route\pgl50h_board_top_pnr.netlist"
 $stage0Registers = @(
     "stage0_fx_q19", "stage0_fy_q19", "stage0_cx_q19", "stage0_cy_q19",
     "stage0_inv_fx_q30", "stage0_inv_fy_q30", "stage0_k1_q28", "stage0_k2_q28",

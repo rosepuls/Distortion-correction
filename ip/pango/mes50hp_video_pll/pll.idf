@@ -5,13 +5,13 @@
         <id>021001</id>
         <display_name>PLL</display_name>
         <name>Logos PLL</name>
-        <version>1.5</version>
+        <version>1.7</version>
         <instance>pll</instance>
         <family>Logos</family>
         <device>PGL50H</device>
         <package>FBG484</package>
         <speedgrade>-6</speedgrade>
-        <generator version="2022.2-SP1.2" build="119398">IP Compiler</generator>
+        <generator version="2022.2-SP6.4" build="146967">IP Compiler</generator>
     </header>
     <param_list>
         <param>
@@ -112,7 +112,7 @@
         </param>
         <param>
             <name>STATIC_DUTY2_basicPage</name>
-            <value>49</value>
+            <value>33</value>
         </param>
         <param>
             <name>DEVICE_PGL22</name>
@@ -197,7 +197,7 @@
         </param>
         <param>
             <name>STATIC_RATIOI_basicPage</name>
-            <value>2</value>
+            <value>3</value>
         </param>
         <param>
             <name>STATIC_DUTY3_basicPage</name>
@@ -245,7 +245,7 @@
         </param>
         <param>
             <name>STATIC_DUTY1_basicPage</name>
-            <value>123</value>
+            <value>82</value>
         </param>
         <param>
             <name>CLKOUT4_EN_advancedPage</name>
@@ -313,7 +313,7 @@
         </param>
         <param>
             <name>STATIC_RATIO2_basicPage</name>
-            <value>49</value>
+            <value>33</value>
         </param>
         <param>
             <name>CLKOUT2_EN_advancedPage</name>
@@ -374,7 +374,7 @@
         </param>
         <param>
             <name>STATIC_RATIO1_basicPage</name>
-            <value>123</value>
+            <value>82</value>
         </param>
         <param>
             <name>STATIC_RATIO3_basicPage</name>
@@ -410,7 +410,7 @@
         </param>
         <param>
             <name>CLKOUT0_REQ_FREQ_basicPage</name>
-            <value>37.1250</value>
+            <value>74.2500</value>
             <decimal>4</decimal>
         </param>
         <param>
@@ -486,7 +486,7 @@
         </param>
         <param>
             <name>STATIC_DUTY0_basicPage</name>
-            <value>33</value>
+            <value>11</value>
         </param>
         <param>
             <name>STATIC_PHASE2_basicPage</name>
@@ -587,7 +587,7 @@
         </param>
         <param>
             <name>STATIC_RATIO0_basicPage</name>
-            <value>33</value>
+            <value>11</value>
         </param>
         <param>
             <name>CLKSWITCH_FLAG_ENABLE_basicPage</name>

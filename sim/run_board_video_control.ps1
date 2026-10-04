@@ -7,7 +7,7 @@ New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 Push-Location $runDirectory
 try {
     & xvlog -sv `
-        (Join-Path $projectRoot 'rtl\board\mes50hp\board_video_control.sv') `
+        (Join-Path $projectRoot 'rtl\board\pgl50h\board_video_control.sv') `
         (Join-Path $projectRoot 'sim\tb_board_video_control.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

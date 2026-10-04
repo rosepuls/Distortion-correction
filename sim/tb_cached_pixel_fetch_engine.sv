@@ -8,6 +8,7 @@ module tb_cached_pixel_fetch_engine;
 
     reg clk = 1'b0;
     reg rst_n = 1'b0;
+    reg frame_start = 1'b0;
     reg in_valid = 1'b0;
     wire in_ready;
     reg [11:0] in_x0 = 12'd0;
@@ -50,6 +51,8 @@ module tb_cached_pixel_fetch_engine;
     ) dut (
         .clk(clk),
         .rst_n(rst_n),
+        .storage_rst_n(rst_n),
+        .frame_start(frame_start),
         .in_valid(in_valid),
         .in_ready(in_ready),
         .in_x0(in_x0),

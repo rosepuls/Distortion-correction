@@ -9,6 +9,7 @@ module tb_cached_pixel_fetch_throughput;
 
     reg clk = 1'b0;
     reg rst_n = 1'b0;
+    reg frame_start = 1'b0;
     reg in_valid = 1'b0;
     wire in_ready;
     reg [11:0] in_x0 = 12'd0;
@@ -54,7 +55,8 @@ module tb_cached_pixel_fetch_throughput;
         .ADDR_WIDTH(ADDR_WIDTH),
         .FRAME_BASE_BYTE_ADDR(FRAME_BASE_BYTE_ADDR)
     ) dut (
-        .clk(clk), .rst_n(rst_n),
+        .clk(clk), .rst_n(rst_n), .storage_rst_n(rst_n),
+        .frame_start(frame_start),
         .in_valid(in_valid), .in_ready(in_ready),
         .in_x0(in_x0), .in_y0(in_y0), .in_fx(in_fx), .in_fy(in_fy),
         .in_coord_valid(in_coord_valid), .in_sof(in_sof), .in_eol(in_eol),
@@ -172,7 +174,7 @@ module tb_cached_pixel_fetch_throughput;
             $display("DEBUG: commands=%0d backend_active=%0d backend_tile=(%0d,%0d) row=%0d beat=%0d cmd_addr=%h reader_state=%0d cache_state=%0d",
                      command_count, backend_active, backend_tx, backend_ty,
                      backend_row, backend_beat, rd_cmd_addr,
-                     dut.burst_reader_inst.state, dut.tile_cache_inst.state);
+                     dut.burst_reader_inst.state, dut.tile_cache_inst.fill_state);
             $display("DEBUG: rd_valid=%0d rd_ready=%0d fill_valid=%0d fill_ready=%0d beat=%0d row=%0d",
                      rd_data_valid, rd_data_ready,
                      dut.reader_fill_data_valid, dut.reader_fill_data_ready,

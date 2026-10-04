@@ -9,6 +9,7 @@ module tb_cached_pixel_fetch_stress;
 
     reg clk = 1'b0;
     reg rst_n = 1'b0;
+    reg frame_start = 1'b0;
     reg in_valid = 1'b0;
     wire in_ready;
     reg [11:0] in_x0 = 12'd0;
@@ -51,7 +52,8 @@ module tb_cached_pixel_fetch_stress;
         .IMAGE_WIDTH(IMAGE_WIDTH), .IMAGE_HEIGHT(IMAGE_HEIGHT),
         .ADDR_WIDTH(ADDR_WIDTH), .FRAME_BASE_BYTE_ADDR(FRAME_BASE_BYTE_ADDR)
     ) dut (
-        .clk(clk), .rst_n(rst_n),
+        .clk(clk), .rst_n(rst_n), .storage_rst_n(rst_n),
+        .frame_start(frame_start),
         .in_valid(in_valid), .in_ready(in_ready),
         .in_x0(in_x0), .in_y0(in_y0), .in_fx(in_fx), .in_fy(in_fy),
         .in_coord_valid(in_coord_valid), .in_sof(in_sof), .in_eol(in_eol),

@@ -14,8 +14,8 @@ if (-not (Test-Path $vectorCopy)) {
 Push-Location $runDirectory
 try {
     & xvlog -sv `
-        (Join-Path $projectRoot 'rtl\distortion\coordinate_split.sv') `
-        (Join-Path $projectRoot 'rtl\distortion\distortion_core_optimized.sv') `
+        (Join-Path $projectRoot 'rtl\algorithm\distortion\coordinate_split.sv') `
+        (Join-Path $projectRoot 'rtl\algorithm\distortion\distortion_core_optimized.sv') `
         (Join-Path $projectRoot 'sim\tb_distortion_core_optimized.sv') `
         (Join-Path $projectRoot 'sim\tb_distortion_core_optimized_stream.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

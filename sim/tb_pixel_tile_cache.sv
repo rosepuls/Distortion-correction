@@ -8,6 +8,7 @@ module tb_pixel_tile_cache;
 
     reg clk = 1'b0;
     reg rst_n = 1'b0;
+    reg invalidate = 1'b0;
     reg lookup_valid = 1'b0;
     wire lookup_ready;
     reg [11:0] lookup_x0 = 12'd0;
@@ -40,6 +41,7 @@ module tb_pixel_tile_cache;
     integer backend_ty = 0;
     integer backend_row = 0;
     integer backend_wait = 0;
+    integer frame_id = 0;
     integer before_fill_count;
     integer i;
     integer replacement_x [0:7];
@@ -55,6 +57,7 @@ module tb_pixel_tile_cache;
     ) dut (
         .clk(clk),
         .rst_n(rst_n),
+        .invalidate(invalidate),
         .lookup_valid(lookup_valid),
         .lookup_ready(lookup_ready),
         .lookup_x0(lookup_x0),
@@ -81,7 +84,7 @@ module tb_pixel_tile_cache;
 
     function automatic [31:0] source_word(input integer source_x, input integer source_y);
         begin
-            source_word = {8'hC3, source_y[7:0], source_x[7:0], 8'h5A};
+            source_word = {8'hC3 + frame_id, source_y[7:0], source_x[7:0], 8'h5A};
         end
     endfunction
 
@@ -209,6 +212,18 @@ module tb_pixel_tile_cache;
 
         // First miss fills one Tile; the next lookup crosses its x boundary.
         lookup_and_check(1, 1, 1, 4);
+
+        // Payload RAM is intentionally not reset.  A reset must retire its
+        // valid tag, so the first lookup after reset refills from the new
+        // source frame rather than exposing this tile's old data.
+        frame_id = 1;
+        @(negedge clk);
+        rst_n <= 1'b0;
+        repeat (2) @(posedge clk);
+        @(negedge clk);
+        rst_n <= 1'b1;
+        lookup_and_check(1, 1, 1, 4);
+
         lookup_and_check(31, 1, 1, 4);
         // Tile (0,1) hashes to set 15; verify the full set index is retained
         // instead of being truncated to the way-index width.
@@ -234,10 +249,23 @@ module tb_pixel_tile_cache;
         );
         lookup_and_check(1, 1, 1, 0);
 
+        // A new frame must not reuse the previous frame's Tile contents.
+        frame_id = 2;
+        @(negedge clk);
+        invalidate <= 1'b1;
+        @(negedge clk);
+        invalidate <= 1'b0;
+        lookup_and_check(1, 1, 1, 4);
+
         if (errors != 0)
             $fatal(1, "TEST_FAIL: pixel_tile_cache errors=%0d", errors);
 
         $display("TEST_PASS: pixel_tile_cache");
         $finish;
+    end
+
+    initial begin
+        #1000000;
+        $fatal(1, "TEST_FAIL: pixel_tile_cache timeout");
     end
 endmodule

@@ -7,7 +7,7 @@ New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 Push-Location $runDirectory
 try {
     & xvlog -sv `
-        (Join-Path $projectRoot 'rtl\board\mes50hp\algorithm_frame_writer_rgbx.sv') `
+        (Join-Path $projectRoot 'rtl\board\pgl50h\algorithm_frame_writer_rgbx.sv') `
         (Join-Path $projectRoot 'sim\tb_algorithm_frame_writer_rgbx.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

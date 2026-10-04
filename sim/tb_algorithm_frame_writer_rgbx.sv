@@ -37,7 +37,8 @@ module tb_algorithm_frame_writer_rgbx;
         .IMAGE_WIDTH(IMAGE_WIDTH),
         .IMAGE_HEIGHT(IMAGE_HEIGHT),
         .DDR_ADDR_WIDTH(DDR_ADDR_WIDTH),
-        .OUTPUT_BASE_ADDR(BASE_ADDR)
+        .OUTPUT_BASE_ADDR(BASE_ADDR),
+        .SIMULATION(1)
     ) dut (
         .clk(clk),
         .rst_n(rst_n),

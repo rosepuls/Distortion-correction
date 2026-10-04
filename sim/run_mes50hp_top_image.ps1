@@ -47,16 +47,17 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Push-Location $runDirectory
 try {
     & xvlog -sv `
-        (Join-Path $projectRoot "rtl\distortion\coordinate_gen.sv") `
-        (Join-Path $projectRoot "rtl\distortion\normalize.sv") `
-        (Join-Path $projectRoot "rtl\distortion\coordinate_split.sv") `
-        (Join-Path $projectRoot "rtl\distortion\distortion_core.sv") `
-        (Join-Path $projectRoot "rtl\distortion\distortion_core_optimized.sv") `
-        (Join-Path $projectRoot "rtl\interpolation\bilinear_interp.sv") `
-        (Join-Path $projectRoot "rtl\memory\pixel_fetch_engine.sv") `
-        (Join-Path $projectRoot "rtl\distortion\distortion_image_pipeline.sv") `
-        (Join-Path $projectRoot "rtl\board\mes50hp\clock_reset.sv") `
-        (Join-Path $projectRoot "rtl\board\mes50hp\mes50hp_top.sv") `
+        (Join-Path $projectRoot "rtl\algorithm\distortion\coordinate_gen.sv") `
+        (Join-Path $projectRoot "rtl\algorithm\distortion\normalize.sv") `
+        (Join-Path $projectRoot "rtl\algorithm\distortion\coordinate_split.sv") `
+        (Join-Path $projectRoot "rtl\algorithm\distortion\distortion_core.sv") `
+        (Join-Path $projectRoot "rtl\algorithm\distortion\distortion_core_optimized.sv") `
+        (Join-Path $projectRoot "rtl\algorithm\interpolation\bilinear_interp.sv") `
+        (Join-Path $projectRoot "rtl\platform\common\memory\pixel_fetch_engine.sv") `
+        (Join-Path $projectRoot "rtl\platform\common\control\algorithm_reset_tree.sv") `
+        (Join-Path $projectRoot "rtl\algorithm\distortion\distortion_image_pipeline.sv") `
+        (Join-Path $projectRoot "rtl\board\pgl50h\clock_reset.sv") `
+        (Join-Path $projectRoot "rtl\board\pgl50h\mes50hp_top.sv") `
         (Join-Path $projectRoot "sim\models\ddr_behavior_model.sv") `
         (Join-Path $projectRoot "sim\tb_mes50hp_top_image.sv")
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

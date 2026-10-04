@@ -291,7 +291,7 @@ RGB888 的一个逻辑像素占 3 个字节，但地址模型中的相邻地址�
 
 ### 6.1 当前基准 RTL 契约
 
-`rtl/distortion/distortion_core.sv` 使用上述格式实现 Brown-Conrady 二阶径向和切向项。输入配置端口统一为 32 bit signed；`cfg_fx_q19`、`cfg_fy_q19`、`cfg_cx_q19`、`cfg_cy_q19` 为 Q13.19，`cfg_inv_fx_q30`、`cfg_inv_fy_q30` 为 Q2.30，`cfg_k1_q28`、`cfg_k2_q28`、`cfg_p1_q28`、`cfg_p2_q28` 为 Q4.28。
+`rtl/algorithm/distortion/distortion_core.sv` 使用上述格式实现 Brown-Conrady 二阶径向和切向项。输入配置端口统一为 32 bit signed；`cfg_fx_q19`、`cfg_fy_q19`、`cfg_cx_q19`、`cfg_cy_q19` 为 Q13.19，`cfg_inv_fx_q30`、`cfg_inv_fy_q30` 为 Q2.30，`cfg_k1_q28`、`cfg_k2_q28`、`cfg_p1_q28`、`cfg_p2_q28` 为 Q4.28。
 
 核心从一次有效坐标输入到 `out_src_x_q19/out_src_y_q19/out_x0/out_y0/out_dx_q16/out_dy_q16/out_coord_valid` 的固定延迟为 5 个时钟周期；其前级 `coordinate_gen.sv` 另有 1 个寄存器级。二者级联时，输入 `valid/sof/eol` 到结果输出的固定延迟为 6 个时钟周期。有效 SOF 周期锁存全套相机配置，帧内配置端口变化不得影响已锁存帧。
 

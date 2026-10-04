@@ -13,8 +13,8 @@ New-Item -ItemType Directory -Force (Join-Path $projectRoot "result\sim_assets")
 Push-Location $runDirectory
 try {
     & xvlog -sv `
-        (Join-Path $projectRoot "rtl\interpolation\bilinear_interp.sv") `
-        (Join-Path $projectRoot "rtl\memory\pixel_fetch_engine.sv") `
+        (Join-Path $projectRoot "rtl\algorithm\interpolation\bilinear_interp.sv") `
+        (Join-Path $projectRoot "rtl\platform\common\memory\pixel_fetch_engine.sv") `
         (Join-Path $projectRoot "sim\models\ddr_behavior_model.sv") `
         (Join-Path $projectRoot "sim\tb_pixel_fetch_image.sv")
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

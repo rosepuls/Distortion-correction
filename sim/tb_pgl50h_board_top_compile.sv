@@ -93,6 +93,25 @@ module tb_pgl50h_board_top_compile;
                      mem_cas_n,mem_we_n,mem_odt,mem_a,mem_ba,mem_dm,heart_beat_led);
             $fatal(1, "TEST_FAIL: X/Z on driven board outputs");
         end
+
+        // The throughput path must enter the board through the Tile Cache
+        // command port, retain byte addressing in the portable core, then
+        // convert to the official controller's 32-bit-word address here.
+        force dut.process_enable = 1'b1;
+        force dut.input_frame_base = 28'h0200000;
+        force dut.cache_rd_cmd_en = 1'b1;
+        force dut.cache_rd_cmd_addr = 32'h0000_0080;
+        force dut.cache_rd_cmd_len = 32'd4;
+        #1;
+        if (dut.cache_ctrl_cmd_addr !== 28'h0200020 ||
+            dut.cache_ctrl_cmd_len !== 32'd4) begin
+            $fatal(1, "TEST_FAIL: board cache adapter address/length mismatch");
+        end
+        release dut.cache_rd_cmd_en;
+        release dut.cache_rd_cmd_addr;
+        release dut.cache_rd_cmd_len;
+        release dut.input_frame_base;
+        release dut.process_enable;
         $display("TEST_PASS: pgl50h_board_top_compile");
         $finish;
     end

@@ -5,11 +5,13 @@ module tb_1080p30_throughput;
     localparam integer IMAGE_HEIGHT = 1080;
     localparam integer PIXELS = IMAGE_WIDTH * IMAGE_HEIGHT;
     localparam integer FRAME_BUDGET = 3333333;
+    localparam integer STRICT_FRAME_BUDGET = 3237729;
     localparam integer ADDR_WIDTH = 32;
     localparam [ADDR_WIDTH-1:0] FRAME_BASE_BYTE_ADDR = 32'h00100000;
 
     reg clk = 1'b0;
     reg rst_n = 1'b0;
+    reg frame_start = 1'b0;
     reg in_valid = 1'b0;
     wire in_ready;
     reg [11:0] in_x0 = 12'd0;
@@ -57,6 +59,8 @@ module tb_1080p30_throughput;
         .FRAME_BASE_BYTE_ADDR(FRAME_BASE_BYTE_ADDR)
     ) dut (
         .clk(clk), .rst_n(rst_n),
+        .storage_rst_n(rst_n),
+        .frame_start(frame_start),
         .in_valid(in_valid), .in_ready(in_ready),
         .in_x0(in_x0), .in_y0(in_y0), .in_fx(in_fx), .in_fy(in_fy),
         .in_coord_valid(in_coord_valid), .in_sof(in_sof), .in_eol(in_eol),
@@ -204,6 +208,10 @@ module tb_1080p30_throughput;
             errors = errors + 1;
         end else if ((end_cycle - start_cycle + 1) > FRAME_BUDGET) begin
             $display("FAIL: frame budget exceeded: %0d cycles",
+                     end_cycle - start_cycle + 1);
+            errors = errors + 1;
+        end else if ((end_cycle - start_cycle + 1) > STRICT_FRAME_BUDGET) begin
+            $display("FAIL: strict cache frame budget exceeded: %0d cycles",
                      end_cycle - start_cycle + 1);
             errors = errors + 1;
         end

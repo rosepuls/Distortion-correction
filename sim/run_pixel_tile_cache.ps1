@@ -7,7 +7,9 @@ New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 Push-Location $runDirectory
 try {
     & xvlog -sv `
-        (Join-Path $projectRoot 'rtl\memory\pixel_tile_cache.sv') `
+        (Join-Path $projectRoot 'rtl\platform\common\memory\pixel_tile_cache.sv') `
+        (Join-Path $projectRoot 'rtl\platform\common\memory\tile_cache_bank_ram.sv') `
+        (Join-Path $projectRoot 'sim\pgl50h_tile_cache_bank_ip_model.sv') `
         (Join-Path $projectRoot 'sim\tb_pixel_tile_cache.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

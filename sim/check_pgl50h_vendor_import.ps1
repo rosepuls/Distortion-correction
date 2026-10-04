@@ -2,18 +2,18 @@ $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $required = @(
-    'rtl/vendor/mes50hp/hdmi/iic_dri.v',
-    'rtl/vendor/mes50hp/hdmi/ms7200_ctl.v',
-    'rtl/vendor/mes50hp/hdmi/ms7210_ctl.v',
-    'rtl/vendor/mes50hp/hdmi/ms72xx_ctl.v',
-    'rtl/vendor/mes50hp/ddr/wr_buf.v',
-    'rtl/vendor/mes50hp/ddr/wr_cmd_trans.v',
-    'rtl/vendor/mes50hp/ddr/wr_ctrl.v',
-    'rtl/vendor/mes50hp/ddr/rd_ctrl.v',
-    'rtl/vendor/mes50hp/ddr/wr_rd_ctrl_top.v',
-    'rtl/vendor/mes50hp/ddr/wr_fram_buf/wr_fram_buf.idf',
-    'rtl/vendor/mes50hp/ddr/rd_fram_buf/rd_fram_buf.idf',
-    'rtl/vendor/mes50hp/video/sync_vg.v',
+    'rtl/vendor/pgl50h/hdmi/iic_dri.v',
+    'rtl/vendor/pgl50h/hdmi/ms7200_ctl.v',
+    'rtl/vendor/pgl50h/hdmi/ms7210_ctl.v',
+    'rtl/vendor/pgl50h/hdmi/ms72xx_ctl.v',
+    'rtl/vendor/pgl50h/ddr/wr_buf.v',
+    'rtl/vendor/pgl50h/ddr/wr_cmd_trans.v',
+    'rtl/vendor/pgl50h/ddr/wr_ctrl.v',
+    'rtl/vendor/pgl50h/ddr/rd_ctrl.v',
+    'rtl/vendor/pgl50h/ddr/wr_rd_ctrl_top.v',
+    'rtl/vendor/pgl50h/ddr/wr_fram_buf/wr_fram_buf.idf',
+    'rtl/vendor/pgl50h/ddr/rd_fram_buf/rd_fram_buf.idf',
+    'rtl/vendor/pgl50h/video/sync_vg.v',
     'ip/pango/mes50hp_video_pll/pll.v',
     'ip/pango/mes50hp_video_pll/pll.idf',
     'ip/pango/DDR3_50H/DDR3_50H.v',
@@ -31,4 +31,4 @@ if ($missing.Count -ne 0) {
     exit 1
 }
 
-Write-Host 'Project-local MES50HP vendor source inventory is complete.'
+Write-Host 'Project-local PGL50H vendor source inventory is complete.'

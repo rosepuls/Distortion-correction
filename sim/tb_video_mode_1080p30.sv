@@ -12,6 +12,7 @@ module tb_video_mode_1080p30;
     wire hs;
     wire vs;
     wire de;
+    wire de_request;
     wire [11:0] x;
     wire [11:0] y;
     wire frame_start;
@@ -27,6 +28,9 @@ module tb_video_mode_1080p30;
     integer last_x = -1;
     integer last_y = -1;
     reg metrics_done = 1'b0;
+    reg de_request_d1 = 1'b0;
+    reg de_request_d2 = 1'b0;
+    integer de_request_count = 0;
 
     always #5 clk = ~clk;
 
@@ -36,6 +40,7 @@ module tb_video_mode_1080p30;
         .hs(hs),
         .vs(vs),
         .de(de),
+        .de_request(de_request),
         .x(x),
         .y(y),
         .frame_start(frame_start)
@@ -43,11 +48,14 @@ module tb_video_mode_1080p30;
 
     always @(posedge clk) begin
         if (rst_n) begin
+            de_request_d1 <= de_request;
+            de_request_d2 <= de_request_d1;
             cycle_count = cycle_count + 1;
             if (frame_start) begin
                 frame_start_count = frame_start_count + 1;
                 if (frame_start_count == 1) begin
                     active_count = 0;
+                    de_request_count = 0;
                     hs_count = 0;
                     vs_count = 0;
                     last_x = -1;
@@ -72,6 +80,12 @@ module tb_video_mode_1080p30;
                     errors = errors + 1;
                 end
             end
+            if (de_request && !metrics_done)
+                de_request_count = de_request_count + 1;
+            if (cycle_count > 2 && de !== de_request_d2) begin
+                $display("FAIL: de_request is not two clocks ahead of de");
+                errors = errors + 1;
+            end
             if (hs && !metrics_done)
                 hs_count = hs_count + 1;
             if (vs && !metrics_done)
@@ -93,6 +107,11 @@ module tb_video_mode_1080p30;
         if (active_count != H_ACTIVE * V_ACTIVE) begin
             $display("FAIL: expected %0d active pixels, got %0d",
                      H_ACTIVE * V_ACTIVE, active_count);
+            errors = errors + 1;
+        end
+        if (de_request_count != H_ACTIVE * V_ACTIVE) begin
+            $display("FAIL: expected %0d read-request pixels, got %0d",
+                     H_ACTIVE * V_ACTIVE, de_request_count);
             errors = errors + 1;
         end
         if (last_x != H_ACTIVE - 1 || last_y != V_ACTIVE - 1) begin

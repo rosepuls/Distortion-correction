@@ -14,6 +14,7 @@ module tb_distortion_correction_image;
 
     reg clk = 1'b0;
     reg rst_n = 1'b0;
+    reg frame_start = 1'b0;
     reg in_valid = 1'b0;
     reg in_sof = 1'b0;
     reg in_eol = 1'b0;
@@ -45,6 +46,7 @@ module tb_distortion_correction_image;
     ) dut (
         .clk(clk),
         .rst_n(rst_n),
+        .frame_start(frame_start),
         .in_valid(in_valid),
         .in_sof(in_sof),
         .in_eol(in_eol),

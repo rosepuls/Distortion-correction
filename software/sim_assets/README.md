@@ -79,3 +79,17 @@ powershell -ExecutionPolicy Bypass -File sim/run_distortion_correction_image.ps1
 `correction_comparison.png` 展示标准图、畸变输入、RTL 矫正结果以及
 RTL 与 Python Golden 的放大差分。XSim 临时文件位于
 `xsim.dir/distortion_correction_image/`。
+
+## 1280×720 RGBX Cache 回归
+
+当前 PGL50H 主路径使用 1280×720@30fps、16 set × 4 way Tile Cache。完整图片回归使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File sim/run_mes50hp_top_cache_image_720p.ps1
+```
+
+结果位于 `result/sim_assets/cache_full_chain_1280x720/`，吞吐率回归使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File sim/run_720p30_throughput.ps1
+```

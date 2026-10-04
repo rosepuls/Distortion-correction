@@ -36,6 +36,22 @@ pds/*/multiseed_summary.csv
 pds/*/pds.log
 pds/*/run.log
 
+# Board-specific PDS generated outputs
+# Keep board PDS definitions, source constraints, curated timing summaries,
+# and hand-written top-level sources; exclude compiler databases and caches.
+boards/*/pds/*/compile/
+boards/*/pds/*/constraint_check/
+boards/*/pds/*/device_map/
+boards/*/pds/*/synthesize/
+boards/*/pds/*/place_route/
+boards/*/pds/*/report_timing/
+boards/*/pds/*/log/
+boards/*/pds/*/logbackup/
+boards/*/pds/*/xsim.dir/
+boards/*/pds/*/*.log
+boards/*/pds/*/*.csv
+boards/*/pds/*/*.lock
+
 # Official PDS reference-project generated outputs
 board_reference/**/compile/
 board_reference/**/device_map/

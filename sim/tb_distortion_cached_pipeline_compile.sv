@@ -3,6 +3,7 @@
 module tb_distortion_cached_pipeline_compile;
     reg clk = 1'b0;
     reg rst_n = 1'b0;
+    reg frame_start = 1'b0;
     wire in_ready;
     wire req_valid;
     wire rsp_ready;
@@ -28,6 +29,7 @@ module tb_distortion_cached_pipeline_compile;
     ) dut (
         .clk(clk),
         .rst_n(rst_n),
+        .frame_start(frame_start),
         .in_valid(1'b0),
         .in_sof(1'b0),
         .in_eol(1'b0),

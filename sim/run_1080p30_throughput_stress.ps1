@@ -7,10 +7,12 @@ New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 Push-Location $runDirectory
 try {
     & xvlog -sv -d STRESS_DDR `
-        (Join-Path $projectRoot 'rtl\memory\ddr_burst_reader.sv') `
-        (Join-Path $projectRoot 'rtl\memory\pixel_tile_cache.sv') `
-        (Join-Path $projectRoot 'rtl\interpolation\bilinear_interp.sv') `
-        (Join-Path $projectRoot 'rtl\memory\cached_pixel_fetch_engine.sv') `
+        (Join-Path $projectRoot 'rtl\platform\common\memory\ddr_burst_reader.sv') `
+        (Join-Path $projectRoot 'rtl\platform\common\memory\pixel_tile_cache.sv') `
+        (Join-Path $projectRoot 'rtl\platform\common\memory\tile_cache_bank_ram.sv') `
+        (Join-Path $projectRoot 'sim\pgl50h_tile_cache_bank_ip_model.sv') `
+        (Join-Path $projectRoot 'rtl\algorithm\interpolation\bilinear_interp.sv') `
+        (Join-Path $projectRoot 'rtl\platform\common\memory\cached_pixel_fetch_engine.sv') `
         (Join-Path $projectRoot 'sim\tb_1080p30_throughput.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

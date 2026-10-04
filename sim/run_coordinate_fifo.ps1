@@ -7,7 +7,7 @@ New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 Push-Location $runDirectory
 try {
     & xvlog -sv `
-        (Join-Path $projectRoot 'rtl\memory\coordinate_fifo.sv') `
+        (Join-Path $projectRoot 'rtl\platform\common\memory\coordinate_fifo.sv') `
         (Join-Path $projectRoot 'sim\tb_coordinate_fifo.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

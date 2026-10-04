@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$source = Get-Content (Join-Path $projectRoot 'rtl\board\mes50hp\algorithm_frame_writer.sv') -Raw
+$source = Get-Content (Join-Path $projectRoot 'rtl\board\pgl50h\algorithm_frame_writer.sv') -Raw
 
 if ($source -match 'reg\s*\[31:0\]\s+line_bank[01]\s*\[') {
     throw 'FAIL: algorithm_frame_writer still infers 32-bit distributed line-bank RAM.'
