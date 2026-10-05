@@ -90,9 +90,18 @@ module pixel_tile_cache #(
     localparam integer BANK_ADDR_WIDTH = (BANK_WORD_COUNT <= 2)
                                          ? 1 : $clog2(BANK_WORD_COUNT);
     localparam integer BANK_READ_STAGES = (BANK_READ_LATENCY < 1) ? 1 : BANK_READ_LATENCY;
-    localparam integer RESPONSE_FIFO_DEPTH = BANK_READ_STAGES + 2;
+    // Keep enough response credits for S0, S1, S2 and the synchronous Bank
+    // pipeline.  The cache engine metadata FIFO has eight entries, so this
+    // remains bounded while allowing a full-rate hit stream to fill the new
+    // front-end pipeline without an acceptance bubble.
+    localparam integer RESPONSE_FIFO_DEPTH = BANK_READ_STAGES + 4;
     localparam integer FIFO_PTR_WIDTH = (RESPONSE_FIFO_DEPTH <= 2)
                                         ? 1 : $clog2(RESPONSE_FIFO_DEPTH);
+    localparam integer FIFO_COUNT_WIDTH = (RESPONSE_FIFO_DEPTH <= 1)
+                                          ? 1 : $clog2(RESPONSE_FIFO_DEPTH + 1);
+    localparam integer OCCUPANCY_WIDTH = $clog2(
+        RESPONSE_FIFO_DEPTH + BANK_READ_STAGES + 5
+    );
 
     localparam [1:0] FILL_IDLE = 2'd0;
     localparam [1:0] FILL_REQ = 2'd1;
@@ -107,11 +116,87 @@ module pixel_tile_cache #(
     reg [WAY_WIDTH-1:0] pending_way;
     reg [SET_WIDTH-1:0] pending_set;
     reg [1:0] pending_row;
-    reg miss_retry_valid;
-    reg [COORD_WIDTH-1:0] miss_retry_x;
-    reg [COORD_WIDTH-1:0] miss_retry_y;
+    reg invalidate_pending;
     reg invalidate_active;
     reg [SET_WIDTH-1:0] invalidate_set;
+    // A request that has completed its Tag probe but has not yet entered S2
+    // contains stale hit/miss bits whenever Tags change (a refill completes
+    // or a frame invalidation clears a set).  Preserve it, let it advance to
+    // S2, then route it through the normal registered retry path before it
+    // can reach replacement or the bank read.
+    reg s1_tag_recheck_pending;
+
+    // S0 owns the accepted external lookup.  All address decode, tag probes
+    // and miss control below consume this register rather than the incoming
+    // FIFO/cache-engine wires, cutting the long FIFO-to-Cache combinational
+    // cone.  A hit may replace S0 in the same cycle; a miss blocks younger
+    // requests until its refill/retry completes.
+    reg s0_valid;
+    reg [COORD_WIDTH-1:0] s0_x0;
+    reg [COORD_WIDTH-1:0] s0_y0;
+
+    // S1 contains only fixed-width address-decode results.  No tag or
+    // replacement decision is allowed to feed back into this stage.
+    reg s1_valid;
+    reg s1_coord_valid;
+    reg [COORD_WIDTH-1:0] s1_tile_x [0:3];
+    reg [COORD_WIDTH-1:0] s1_tile_y [0:3];
+    reg [SET_WIDTH-1:0] s1_set [0:3];
+    reg [4:0] s1_local_x [0:3];
+    reg [1:0] s1_local_y [0:3];
+    reg [1:0] s1_bank [0:3];
+    reg [1:0] s1_slot [0:3];
+
+    // S1 Tag registers split the four-way Tag comparison from first-miss
+    // selection.  This keeps the normal lookup path from forming the long
+    // s1_set -> Tag compare -> summary/first-miss -> S2 cone reported by PDS.
+    reg s1_tag_valid;
+    reg s1_tag_coord_valid;
+    reg [COORD_WIDTH-1:0] s1_tag_tile_x [0:3];
+    reg [COORD_WIDTH-1:0] s1_tag_tile_y [0:3];
+    reg [SET_WIDTH-1:0] s1_tag_set [0:3];
+    reg [4:0] s1_tag_local_x [0:3];
+    reg [1:0] s1_tag_local_y [0:3];
+    reg [WAY_WIDTH-1:0] s1_tag_way [0:3];
+    reg [1:0] s1_tag_bank [0:3];
+    reg [1:0] s1_tag_slot [0:3];
+    reg s1_tag_hit [0:3];
+
+    // S2 owns the registered Tag summary.  A miss remains here while refill
+    // runs; younger S1/S0 requests are frozen and therefore cannot overtake
+    // it.  A completed refill retries the held address through dedicated
+    // address, Tag-probe and result registers, so the refill-only recheck
+    // cannot form a s2_set -> Tag -> s2_missing combinational feedback path.
+    reg s2_valid;
+    reg s2_retry_capture_pending /* synthesis syn_preserve = 1 */;
+    reg s2_retry_probe_pending /* synthesis syn_preserve = 1 */;
+    reg s2_retry_result_pending /* synthesis syn_preserve = 1 */;
+    reg s2_coord_valid;
+    reg [COORD_WIDTH-1:0] s2_tile_x [0:3];
+    reg [COORD_WIDTH-1:0] s2_tile_y [0:3];
+    reg [SET_WIDTH-1:0] s2_set [0:3];
+    reg [4:0] s2_local_x [0:3];
+    reg [1:0] s2_local_y [0:3];
+    reg [WAY_WIDTH-1:0] s2_way [0:3];
+    reg [1:0] s2_bank [0:3];
+    reg [1:0] s2_slot [0:3];
+    reg s2_all_hit;
+    reg s2_missing_found;
+    reg [COORD_WIDTH-1:0] s2_missing_tile_x;
+    reg [COORD_WIDTH-1:0] s2_missing_tile_y;
+    reg [SET_WIDTH-1:0] s2_missing_set;
+
+    // Refill retry pipeline.  It is only active while the held S2 request is
+    // being re-probed; normal lookups use the S0 -> S1 -> S1 Tag -> S2 path.
+    reg [COORD_WIDTH-1:0] retry_tile_x [0:3]
+        /* synthesis syn_preserve = 1 */;
+    reg [COORD_WIDTH-1:0] retry_tile_y [0:3]
+        /* synthesis syn_preserve = 1 */;
+    reg [SET_WIDTH-1:0] retry_set [0:3]
+        /* synthesis syn_preserve = 1 */;
+    reg retry_tag_hit [0:3] /* synthesis syn_preserve = 1 */;
+    reg [WAY_WIDTH-1:0] retry_tag_way [0:3]
+        /* synthesis syn_preserve = 1 */;
 
     // Four independent tag probes are required for each 2x2 neighborhood.
     // Leaving these shallow arrays unconstrained makes PDS replicate them as
@@ -138,52 +223,71 @@ module pixel_tile_cache #(
     reg [PLRU_BITS-1:0] plru_state_mem [0:SET_COUNT-1]
         /* synthesis syn_ramstyle = "registers" */;
 
-    reg [COORD_WIDTH-1:0] req_x [0:3];
-    reg [COORD_WIDTH-1:0] req_y [0:3];
-    reg [COORD_WIDTH-1:0] req_tile_x [0:3];
-    reg [COORD_WIDTH-1:0] req_tile_y [0:3];
-    integer req_set [0:3];
-    integer req_local_x [0:3];
-    integer req_local_y [0:3];
-    reg req_hit [0:3];
-    reg [WAY_WIDTH-1:0] req_way [0:3];
-    reg [1:0] req_bank [0:3];
-    reg [1:0] req_slot [0:3];
-    reg req_coord_valid;
-    reg req_all_hit;
-    reg [COORD_WIDTH-1:0] missing_tile_x_comb;
-    reg [COORD_WIDTH-1:0] missing_tile_y_comb;
-    integer missing_set_comb;
-    integer selected_way_comb;
+    reg [COORD_WIDTH-1:0] decode_req_x [0:3];
+    reg [COORD_WIDTH-1:0] decode_req_y [0:3];
+    reg [COORD_WIDTH-1:0] decode_tile_x [0:3];
+    reg [COORD_WIDTH-1:0] decode_tile_y [0:3];
+    reg [SET_WIDTH-1:0] decode_set [0:3];
+    reg [4:0] decode_local_x [0:3];
+    reg [1:0] decode_local_y [0:3];
+    reg [1:0] decode_bank [0:3];
+    reg [1:0] decode_slot [0:3];
+    reg decode_coord_valid;
+
+    reg tag_hit_comb [0:3];
+    reg [WAY_WIDTH-1:0] tag_way_comb [0:3];
+    reg s1_tag_all_hit_comb;
+    reg s1_tag_missing_found_comb;
+    reg [COORD_WIDTH-1:0] s1_tag_missing_tile_x_comb;
+    reg [COORD_WIDTH-1:0] s1_tag_missing_tile_y_comb;
+    reg [SET_WIDTH-1:0] s1_tag_missing_set_comb;
+    reg retry_all_hit_comb;
+    reg retry_missing_found_comb;
+    reg [COORD_WIDTH-1:0] retry_missing_tile_x_comb;
+    reg [COORD_WIDTH-1:0] retry_missing_tile_y_comb;
+    reg [SET_WIDTH-1:0] retry_missing_set_comb;
+    reg retry_probe_hit_comb [0:3];
+    reg [WAY_WIDTH-1:0] retry_probe_way_comb [0:3];
+    reg [WAY_WIDTH-1:0] selected_way_comb;
     reg selected_invalid_comb;
-    integer best_rank_comb;
+    reg [WAY_WIDTH-1:0] best_rank_comb;
+    integer decode_i;
     integer tag_i;
     integer tag_way_i;
-    wire [COORD_WIDTH-1:0] decode_x = miss_retry_valid ? miss_retry_x : lookup_x0;
-    wire [COORD_WIDTH-1:0] decode_y = miss_retry_valid ? miss_retry_y : lookup_y0;
+    integer retry_i;
+    integer retry_way_i;
+    integer victim_way_i;
 
-    function automatic integer tile_set_index(input integer tile_x, input integer tile_y);
+    function automatic [SET_WIDTH-1:0] tile_set_index(
+        input [COORD_WIDTH-1:0] tile_x,
+        input [COORD_WIDTH-1:0] tile_y
+    );
+        reg [COORD_WIDTH:0] set_hash;
         begin
             // SET_COUNT is constrained to a power of two.  The low bits are
             // the exact modulo result for both positive and negative
             // two's-complement skew values, with no divider or bmsSMOD.
-            tile_set_index = (tile_x - tile_y + (tile_x >> 2)) & (SET_COUNT - 1);
+            set_hash = {1'b0, tile_x} - {1'b0, tile_y}
+                       + ({1'b0, tile_x} >> 2);
+            tile_set_index = set_hash[SET_WIDTH-1:0];
         end
     endfunction
 
-    function automatic integer bank_word_index(
-        input integer set_index_value,
-        input integer way_index,
-        input integer local_x,
-        input integer local_y
+    function automatic [BANK_ADDR_WIDTH-1:0] bank_word_index(
+        input [SET_WIDTH-1:0] set_index_value,
+        input [WAY_WIDTH-1:0] way_index,
+        input [4:0] local_x,
+        input [1:0] local_y
     );
         begin
             if ((SET_COUNT == 32) && (TILE_W == 32) && (TILE_H == 4)
                 && (WAYS == 8))
-                bank_word_index = (set_index_value << 6)
-                                  + (way_index << 3)
-                                  + ((local_y >> 1) << 2)
-                                  + (local_x >> 3);
+                bank_word_index = {set_index_value, way_index,
+                                   local_y[1], local_x[4:3]};
+            else if ((SET_COUNT == 16) && (TILE_W == 32) && (TILE_H == 4)
+                     && (WAYS == 4))
+                bank_word_index = {set_index_value, way_index,
+                                   local_y[1], local_x[4:3]};
             else
                 bank_word_index = (set_index_value * WAYS + way_index)
                                   * BANK_WORDS_PER_TILE
@@ -231,7 +335,7 @@ module pixel_tile_cache #(
         end
     endfunction
 
-    function automatic integer plru_victim_index(
+    function automatic [WAY_WIDTH-1:0] plru_victim_index(
         input [PLRU_BITS-1:0] state_value
     );
         reg [2:0] victim_value;
@@ -265,99 +369,166 @@ module pixel_tile_cache #(
         end
     endfunction
 
-    // Tag lookup and fixed Tile/local-coordinate arithmetic.
+    // S1 combinational input: fixed Tile/local-coordinate arithmetic only.
+    // Every result is captured before any metadata lookup begins.
     always @* begin
-        req_x[0] = decode_x;
-        req_y[0] = decode_y;
-        req_x[1] = decode_x + 1'b1;
-        req_y[1] = decode_y;
-        req_x[2] = decode_x;
-        req_y[2] = decode_y + 1'b1;
-        req_x[3] = decode_x + 1'b1;
-        req_y[3] = decode_y + 1'b1;
-        req_coord_valid = (decode_x < IMAGE_WIDTH - 1)
-                          && (decode_y < IMAGE_HEIGHT - 1);
-        req_all_hit = 1'b1;
-        missing_tile_x_comb = 0;
-        missing_tile_y_comb = 0;
-        missing_set_comb = 0;
-        selected_way_comb = 0;
-        selected_invalid_comb = 1'b0;
+        decode_req_x[0] = s0_x0;
+        decode_req_y[0] = s0_y0;
+        decode_req_x[1] = s0_x0 + 1'b1;
+        decode_req_y[1] = s0_y0;
+        decode_req_x[2] = s0_x0;
+        decode_req_y[2] = s0_y0 + 1'b1;
+        decode_req_x[3] = s0_x0 + 1'b1;
+        decode_req_y[3] = s0_y0 + 1'b1;
+        decode_coord_valid = (s0_x0 < IMAGE_WIDTH - 1)
+                             && (s0_y0 < IMAGE_HEIGHT - 1);
 
+        for (decode_i = 0; decode_i < 4; decode_i = decode_i + 1) begin
+            decode_tile_x[decode_i] = decode_req_x[decode_i] >> 5;
+            decode_tile_y[decode_i] = decode_req_y[decode_i] >> 2;
+            decode_local_x[decode_i] = decode_req_x[decode_i] & 31;
+            decode_local_y[decode_i] = decode_req_y[decode_i] & 3;
+            decode_set[decode_i] = tile_set_index(
+                decode_tile_x[decode_i], decode_tile_y[decode_i]
+            );
+            decode_bank[decode_i] = {decode_local_y[decode_i][0],
+                                     decode_local_x[decode_i][0]};
+            decode_slot[decode_i] = decode_local_x[decode_i][2:1];
+        end
+    end
+
+    // Normal Tag probe: only per-neighborhood four-way comparisons are made
+    // from registered S1 addresses in this cycle.  The all-hit and first-miss
+    // summary is deferred until the registered S1 Tag stage reaches S2.
+    always @* begin
         for (tag_i = 0; tag_i < 4; tag_i = tag_i + 1) begin
-            req_tile_x[tag_i] = req_x[tag_i] >> 5;
-            req_tile_y[tag_i] = req_y[tag_i] >> 2;
-            req_local_x[tag_i] = req_x[tag_i] & 31;
-            req_local_y[tag_i] = req_y[tag_i] & 3;
-            req_set[tag_i] = tile_set_index(req_tile_x[tag_i], req_tile_y[tag_i]);
-            req_bank[tag_i] = ((req_local_y[tag_i] & 1) << 1)
-                              | (req_local_x[tag_i] & 1);
-            req_slot[tag_i] = (req_local_x[tag_i] >> 1) & 3;
-            req_hit[tag_i] = 1'b0;
-            req_way[tag_i] = {WAY_WIDTH{1'b0}};
+            tag_hit_comb[tag_i] = 1'b0;
+            tag_way_comb[tag_i] = {WAY_WIDTH{1'b0}};
             for (tag_way_i = 0; tag_way_i < WAYS; tag_way_i = tag_way_i + 1)
-                if (valid_mem[req_set[tag_i]][tag_way_i]
-                    && tag_x_mem[req_set[tag_i]][tag_way_i] == req_tile_x[tag_i]
-                    && tag_y_mem[req_set[tag_i]][tag_way_i] == req_tile_y[tag_i]) begin
-                    req_hit[tag_i] = 1'b1;
-                    req_way[tag_i] = tag_way_i;
+                if (valid_mem[s1_set[tag_i]][tag_way_i]
+                    && tag_x_mem[s1_set[tag_i]][tag_way_i]
+                       == s1_tile_x[tag_i]
+                    && tag_y_mem[s1_set[tag_i]][tag_way_i]
+                       == s1_tile_y[tag_i]) begin
+                    tag_hit_comb[tag_i] = 1'b1;
+                    tag_way_comb[tag_i] = tag_way_i;
                 end
-            if (!req_hit[tag_i]) begin
-                req_all_hit = 1'b0;
-                if (missing_tile_x_comb == 0 && missing_tile_y_comb == 0) begin
-                    missing_tile_x_comb = req_tile_x[tag_i];
-                    missing_tile_y_comb = req_tile_y[tag_i];
-                    missing_set_comb = req_set[tag_i];
+        end
+    end
+
+    // missing_found is explicit so Tile (0,0) is a normal address.
+    always @* begin
+        s1_tag_all_hit_comb = 1'b1;
+        s1_tag_missing_found_comb = 1'b0;
+        s1_tag_missing_tile_x_comb = {COORD_WIDTH{1'b0}};
+        s1_tag_missing_tile_y_comb = {COORD_WIDTH{1'b0}};
+        s1_tag_missing_set_comb = {SET_WIDTH{1'b0}};
+        for (tag_i = 0; tag_i < 4; tag_i = tag_i + 1)
+            if (!s1_tag_hit[tag_i]) begin
+                s1_tag_all_hit_comb = 1'b0;
+                if (!s1_tag_missing_found_comb) begin
+                    s1_tag_missing_found_comb = 1'b1;
+                    s1_tag_missing_tile_x_comb = s1_tag_tile_x[tag_i];
+                    s1_tag_missing_tile_y_comb = s1_tag_tile_y[tag_i];
+                    s1_tag_missing_set_comb = s1_tag_set[tag_i];
                 end
             end
-        end
+    end
 
-        if (req_coord_valid) begin
-            missing_set_comb = tile_set_index(missing_tile_x_comb,
-                                              missing_tile_y_comb);
-            for (tag_way_i = 0; tag_way_i < WAYS; tag_way_i = tag_way_i + 1) begin
-                if (!valid_mem[missing_set_comb][tag_way_i]
+    // Refill retry Tag probe.  This stage contains only the per-neighborhood
+    // four-way comparisons.  Selecting the first missing neighborhood is
+    // intentionally deferred to retry_result_pending in the next cycle.
+    always @* begin
+        for (retry_i = 0; retry_i < 4; retry_i = retry_i + 1) begin
+            retry_probe_hit_comb[retry_i] = 1'b0;
+            retry_probe_way_comb[retry_i] = {WAY_WIDTH{1'b0}};
+            for (retry_way_i = 0; retry_way_i < WAYS;
+                 retry_way_i = retry_way_i + 1)
+                if (valid_mem[retry_set[retry_i]][retry_way_i]
+                    && tag_x_mem[retry_set[retry_i]][retry_way_i]
+                       == retry_tile_x[retry_i]
+                    && tag_y_mem[retry_set[retry_i]][retry_way_i]
+                       == retry_tile_y[retry_i]) begin
+                    retry_probe_hit_comb[retry_i] = 1'b1;
+                    retry_probe_way_comb[retry_i] = retry_way_i;
+                end
+        end
+    end
+
+    always @* begin
+        retry_all_hit_comb = 1'b1;
+        retry_missing_found_comb = 1'b0;
+        retry_missing_tile_x_comb = {COORD_WIDTH{1'b0}};
+        retry_missing_tile_y_comb = {COORD_WIDTH{1'b0}};
+        retry_missing_set_comb = {SET_WIDTH{1'b0}};
+        for (retry_i = 0; retry_i < 4; retry_i = retry_i + 1)
+            if (!retry_tag_hit[retry_i]) begin
+                retry_all_hit_comb = 1'b0;
+                if (!retry_missing_found_comb) begin
+                    retry_missing_found_comb = 1'b1;
+                    retry_missing_tile_x_comb = retry_tile_x[retry_i];
+                    retry_missing_tile_y_comb = retry_tile_y[retry_i];
+                    retry_missing_set_comb = retry_set[retry_i];
+                end
+            end
+    end
+
+    wire request_hit = s2_valid && s2_coord_valid && s2_all_hit;
+    wire request_black = s2_valid && !s2_coord_valid;
+    wire request_miss = s2_valid && s2_coord_valid && !s2_all_hit;
+
+    // Victim selection is intentionally downstream of the registered S2 Tag
+    // result and is active only for a real miss.  It can no longer absorb the
+    // coordinate decode and four Tag comparisons into the metadata write.
+    always @* begin
+        selected_way_comb = 0;
+        selected_invalid_comb = 1'b0;
+        best_rank_comb = 0;
+        if (request_miss && s2_missing_found) begin
+            for (victim_way_i = 0; victim_way_i < WAYS;
+                 victim_way_i = victim_way_i + 1) begin
+                if (!valid_mem[s2_missing_set][victim_way_i]
                     && !selected_invalid_comb) begin
-                    selected_way_comb = tag_way_i;
+                    selected_way_comb = victim_way_i;
                     selected_invalid_comb = 1'b1;
                 end
             end
             if (!selected_invalid_comb) begin
                 if (USE_TREE_PLRU != 0) begin
-                    selected_way_comb = plru_victim_index(plru_state_mem[missing_set_comb]);
+                    selected_way_comb = plru_victim_index(
+                        plru_state_mem[s2_missing_set]
+                    );
                 end else begin
                     selected_way_comb = 0;
                     best_rank_comb = 0;
-                    for (tag_way_i = 0; tag_way_i < WAYS; tag_way_i = tag_way_i + 1)
-                        if (valid_mem[missing_set_comb][tag_way_i]
-                            && (lru_rank_mem[missing_set_comb][tag_way_i] >= best_rank_comb)) begin
-                            best_rank_comb = lru_rank_mem[missing_set_comb][tag_way_i];
-                            selected_way_comb = tag_way_i;
+                    for (victim_way_i = 0; victim_way_i < WAYS;
+                         victim_way_i = victim_way_i + 1)
+                        if (valid_mem[s2_missing_set][victim_way_i]
+                            && (lru_rank_mem[s2_missing_set][victim_way_i]
+                                >= best_rank_comb)) begin
+                            best_rank_comb = lru_rank_mem[s2_missing_set][victim_way_i];
+                            selected_way_comb = victim_way_i;
                         end
                 end
             end
         end
     end
 
-    wire request_hit = req_coord_valid && req_all_hit;
-    wire request_black = !req_coord_valid;
-    wire request_miss = req_coord_valid && !req_all_hit;
-
     // Hit/black response pipeline.  The pipeline token and the synchronous
     // bank output have identical latency, so no per-hit bubble is introduced.
     reg [1:0] pipe_kind [0:BANK_READ_STAGES-1];
     reg [1:0] pipe_bank [0:BANK_READ_STAGES-1][0:3];
     reg [1:0] pipe_slot [0:BANK_READ_STAGES-1][0:3];
-    integer pipe_valid_count;
+    reg [FIFO_COUNT_WIDTH-1:0] pipe_valid_count;
     integer pipe_i;
     always @* begin
-        pipe_valid_count = 0;
+        pipe_valid_count = {FIFO_COUNT_WIDTH{1'b0}};
         for (pipe_i = 0; pipe_i < BANK_READ_STAGES; pipe_i = pipe_i + 1)
             if (pipe_kind[pipe_i] != PIPE_EMPTY)
-                pipe_valid_count = pipe_valid_count + 1;
+                pipe_valid_count = pipe_valid_count + 1'b1;
     end
 
-    integer fifo_count;
+    reg [FIFO_COUNT_WIDTH-1:0] fifo_count;
     reg [FIFO_PTR_WIDTH-1:0] fifo_wr_ptr;
     reg [FIFO_PTR_WIDTH-1:0] fifo_rd_ptr;
     reg [PIXEL_WIDTH-1:0] fifo_p00 [0:RESPONSE_FIFO_DEPTH-1];
@@ -374,14 +545,26 @@ module pixel_tile_cache #(
     assign coord_valid = (fifo_count != 0) && fifo_coord[fifo_rd_ptr];
     assign cache_hit = coord_valid;
 
-    wire lookup_capacity = (fifo_count + pipe_valid_count < RESPONSE_FIFO_DEPTH);
-    assign lookup_ready = rst_n && !invalidate && !invalidate_active && !miss_retry_valid
-                          && (fill_state == FILL_IDLE) && lookup_capacity;
+    wire response_pop = lookup_rsp_valid && lookup_rsp_ready;
+    wire [OCCUPANCY_WIDTH-1:0] lookup_occupied = fifo_count
+        + pipe_valid_count + s0_valid + s1_valid + s1_tag_valid + s2_valid;
+    wire lookup_capacity = (lookup_occupied < RESPONSE_FIFO_DEPTH)
+                           || response_pop;
+    wire pipeline_operational = rst_n && !invalidate && !invalidate_pending
+                                && !invalidate_active
+                                && (fill_state == FILL_IDLE);
+    // S2 hit/black requests retire into the Bank/response pipeline.  An S2
+    // miss or a post-refill Tag retry freezes every younger stage.
+    wire retry_active = s2_retry_capture_pending || s2_retry_probe_pending
+                        || s2_retry_result_pending;
+    wire pipeline_advance = pipeline_operational && !retry_active
+                            && (!s2_valid || !request_miss);
+    assign lookup_ready = pipeline_advance && lookup_capacity;
     wire external_lookup_fire = lookup_valid && lookup_ready;
-    wire retry_fire = rst_n && !invalidate && !invalidate_active && miss_retry_valid
-                      && (fill_state == FILL_IDLE) && lookup_capacity;
-    wire lookup_fire = external_lookup_fire || retry_fire;
-    wire bank_read_en = lookup_fire && request_hit;
+    wire s2_fire = pipeline_advance && s2_valid;
+    wire start_miss = pipeline_operational && s2_valid && request_miss
+                      && !retry_active;
+    wire bank_read_en = s2_fire && request_hit;
 
     reg [BANK_ADDR_WIDTH-1:0] bank_rd_addr_comb [0:3];
     integer bank_addr_i;
@@ -390,9 +573,9 @@ module pixel_tile_cache #(
             bank_rd_addr_comb[bank_addr_i] = {BANK_ADDR_WIDTH{1'b0}};
         if (request_hit)
             for (bank_addr_i = 0; bank_addr_i < 4; bank_addr_i = bank_addr_i + 1)
-                bank_rd_addr_comb[req_bank[bank_addr_i]] = bank_word_index(
-                    req_set[bank_addr_i], req_way[bank_addr_i],
-                    req_local_x[bank_addr_i], req_local_y[bank_addr_i]
+                bank_rd_addr_comb[s2_bank[bank_addr_i]] = bank_word_index(
+                    s2_set[bank_addr_i], s2_way[bank_addr_i],
+                    s2_local_x[bank_addr_i], s2_local_y[bank_addr_i]
                 );
     end
 
@@ -473,7 +656,6 @@ module pixel_tile_cache #(
     wire response_push = (pipe_kind[BANK_READ_STAGES-1] == PIPE_BLACK)
                          || ((pipe_kind[BANK_READ_STAGES-1] == PIPE_HIT)
                              && bank_rsp_valid);
-    wire response_pop = lookup_rsp_valid && lookup_rsp_ready;
 
     task automatic touch_lru(input integer set_index_value, input integer way_index);
         integer old_rank;
@@ -505,11 +687,19 @@ module pixel_tile_cache #(
             pending_way <= 0;
             pending_set <= 0;
             pending_row <= 0;
-            miss_retry_valid <= 1'b0;
-            miss_retry_x <= 0;
-            miss_retry_y <= 0;
+            invalidate_pending <= 1'b0;
             invalidate_active <= 1'b0;
             invalidate_set <= 0;
+            s1_tag_recheck_pending <= 1'b0;
+            s0_valid <= 1'b0;
+            s0_x0 <= 0;
+            s0_y0 <= 0;
+            s1_valid <= 1'b0;
+            s1_tag_valid <= 1'b0;
+            s2_valid <= 1'b0;
+            s2_retry_capture_pending <= 1'b0;
+            s2_retry_probe_pending <= 1'b0;
+            s2_retry_result_pending <= 1'b0;
             fifo_count <= 0;
             fifo_wr_ptr <= 0;
             fifo_rd_ptr <= 0;
@@ -527,22 +717,142 @@ module pixel_tile_cache #(
             // Keep response pixels and bank/slot payloads out of the reset
             // tree; only their validity/state requires initialization.
         end else begin
+            // Advance S0 -> S1 decode -> S1 Tag -> S2 summary as one elastic
+            // front pipeline.  A held S2 miss stops all four stages, preserving
+            // request order without sacrificing one-per-cycle hit flow.
+            if (pipeline_advance) begin
+                s0_valid <= external_lookup_fire;
+                if (external_lookup_fire) begin
+                    s0_x0 <= lookup_x0;
+                    s0_y0 <= lookup_y0;
+                end
+
+                s1_valid <= s0_valid;
+                if (s0_valid) begin
+                    s1_coord_valid <= decode_coord_valid;
+                    for (reset_bank_i = 0; reset_bank_i < 4;
+                         reset_bank_i = reset_bank_i + 1) begin
+                        s1_tile_x[reset_bank_i] <= decode_tile_x[reset_bank_i];
+                        s1_tile_y[reset_bank_i] <= decode_tile_y[reset_bank_i];
+                        s1_set[reset_bank_i] <= decode_set[reset_bank_i];
+                        s1_local_x[reset_bank_i] <= decode_local_x[reset_bank_i];
+                        s1_local_y[reset_bank_i] <= decode_local_y[reset_bank_i];
+                        s1_bank[reset_bank_i] <= decode_bank[reset_bank_i];
+                        s1_slot[reset_bank_i] <= decode_slot[reset_bank_i];
+                    end
+                end
+
+                s1_tag_valid <= s1_valid;
+                if (s1_valid) begin
+                    s1_tag_coord_valid <= s1_coord_valid;
+                    for (reset_bank_i = 0; reset_bank_i < 4;
+                         reset_bank_i = reset_bank_i + 1) begin
+                        s1_tag_tile_x[reset_bank_i] <= s1_tile_x[reset_bank_i];
+                        s1_tag_tile_y[reset_bank_i] <= s1_tile_y[reset_bank_i];
+                        s1_tag_set[reset_bank_i] <= s1_set[reset_bank_i];
+                        s1_tag_local_x[reset_bank_i] <= s1_local_x[reset_bank_i];
+                        s1_tag_local_y[reset_bank_i] <= s1_local_y[reset_bank_i];
+                        s1_tag_way[reset_bank_i] <= tag_way_comb[reset_bank_i];
+                        s1_tag_bank[reset_bank_i] <= s1_bank[reset_bank_i];
+                        s1_tag_slot[reset_bank_i] <= s1_slot[reset_bank_i];
+                        s1_tag_hit[reset_bank_i] <= tag_hit_comb[reset_bank_i];
+                    end
+                end
+
+                s2_valid <= s1_tag_valid;
+                if (s1_tag_valid) begin
+                    s2_coord_valid <= s1_tag_coord_valid;
+                    s2_all_hit <= s1_tag_all_hit_comb;
+                    s2_missing_found <= s1_tag_missing_found_comb;
+                    s2_missing_tile_x <= s1_tag_missing_tile_x_comb;
+                    s2_missing_tile_y <= s1_tag_missing_tile_y_comb;
+                    s2_missing_set <= s1_tag_missing_set_comb;
+                    for (reset_bank_i = 0; reset_bank_i < 4;
+                         reset_bank_i = reset_bank_i + 1) begin
+                        s2_tile_x[reset_bank_i] <= s1_tag_tile_x[reset_bank_i];
+                        s2_tile_y[reset_bank_i] <= s1_tag_tile_y[reset_bank_i];
+                        s2_set[reset_bank_i] <= s1_tag_set[reset_bank_i];
+                        s2_local_x[reset_bank_i] <= s1_tag_local_x[reset_bank_i];
+                        s2_local_y[reset_bank_i] <= s1_tag_local_y[reset_bank_i];
+                        s2_way[reset_bank_i] <= s1_tag_way[reset_bank_i];
+                        s2_bank[reset_bank_i] <= s1_tag_bank[reset_bank_i];
+                        s2_slot[reset_bank_i] <= s1_tag_slot[reset_bank_i];
+                    end
+                end
+            end
+
+            // Metadata written on the final refill beat becomes visible on
+            // the following cycle.  Capture the held decoded address first,
+            // then probe Tags, then commit the summary result.  S0/S1 remain
+            // held for all three retry stages.
+            if (s2_retry_capture_pending && (fill_state == FILL_IDLE)
+                && !invalidate && !invalidate_pending && !invalidate_active) begin
+                for (reset_bank_i = 0; reset_bank_i < 4;
+                     reset_bank_i = reset_bank_i + 1) begin
+                    retry_tile_x[reset_bank_i] <= s2_tile_x[reset_bank_i];
+                    retry_tile_y[reset_bank_i] <= s2_tile_y[reset_bank_i];
+                    retry_set[reset_bank_i] <= s2_set[reset_bank_i];
+                end
+                s2_retry_capture_pending <= 1'b0;
+                s2_retry_probe_pending <= 1'b1;
+            end else if (s2_retry_probe_pending && (fill_state == FILL_IDLE)
+                         && !invalidate && !invalidate_pending
+                         && !invalidate_active) begin
+                for (reset_bank_i = 0; reset_bank_i < 4;
+                     reset_bank_i = reset_bank_i + 1) begin
+                    retry_tag_hit[reset_bank_i] <= retry_probe_hit_comb[reset_bank_i];
+                    retry_tag_way[reset_bank_i] <= retry_probe_way_comb[reset_bank_i];
+                end
+                s2_retry_probe_pending <= 1'b0;
+                s2_retry_result_pending <= 1'b1;
+            end else if (s2_retry_result_pending && (fill_state == FILL_IDLE)
+                         && !invalidate && !invalidate_pending
+                         && !invalidate_active) begin
+                s2_all_hit <= retry_all_hit_comb;
+                s2_missing_found <= retry_missing_found_comb;
+                s2_missing_tile_x <= retry_missing_tile_x_comb;
+                s2_missing_tile_y <= retry_missing_tile_y_comb;
+                s2_missing_set <= retry_missing_set_comb;
+                for (reset_bank_i = 0; reset_bank_i < 4;
+                     reset_bank_i = reset_bank_i + 1) begin
+                    s2_way[reset_bank_i] <= retry_tag_way[reset_bank_i];
+                end
+                s2_retry_result_pending <= 1'b0;
+            end
+
             // A frame boundary invalidates tags a set at a time.  This keeps
             // the operation bounded and avoids a large reset fanout while
             // guaranteeing that no tile from the previous frame can hit.
+            if (invalidate)
+                invalidate_pending <= 1'b1;
+
             if (invalidate_active) begin
                 for (reset_way_i = 0; reset_way_i < WAYS; reset_way_i = reset_way_i + 1)
                     valid_mem[invalidate_set][reset_way_i] <= 1'b0;
                 if (invalidate_set == SET_COUNT - 1) begin
                     invalidate_active <= 1'b0;
                     invalidate_set <= 0;
+                    if (s2_valid)
+                        s2_retry_capture_pending <= 1'b1;
+                    if (s1_tag_valid)
+                        s1_tag_recheck_pending <= 1'b1;
                 end else begin
                     invalidate_set <= invalidate_set + 1'b1;
                 end
-            end else if (invalidate && (fill_state == FILL_IDLE)
-                         && !miss_retry_valid) begin
+            end else if ((invalidate_pending || invalidate)
+                         && (fill_state == FILL_IDLE)) begin
+                invalidate_pending <= 1'b0;
                 invalidate_active <= 1'b1;
                 invalidate_set <= 0;
+            end
+
+            // A Tag update may leave an older S1 Tag result behind the held
+            // S2 request.  Once that result transfers to S2, freeze it and
+            // reuse the three-stage retry path so Tags are re-probed.
+            if (s1_tag_recheck_pending && !retry_active
+                && pipeline_operational && s1_tag_valid) begin
+                s2_retry_capture_pending <= 1'b1;
+                s1_tag_recheck_pending <= 1'b0;
             end
 
             for (shift_pipe_i = BANK_READ_STAGES-1;
@@ -557,14 +867,14 @@ module pixel_tile_cache #(
                 end
             end
             pipe_kind[0] <= PIPE_EMPTY;
-            if (lookup_fire) begin
+            if (s2_fire) begin
                 if (request_black)
                     pipe_kind[0] <= PIPE_BLACK;
                 else if (request_hit) begin
                     pipe_kind[0] <= PIPE_HIT;
                     for (reset_bank_i = 0; reset_bank_i < 4; reset_bank_i = reset_bank_i + 1) begin
-                        pipe_bank[0][reset_bank_i] <= req_bank[reset_bank_i];
-                        pipe_slot[0][reset_bank_i] <= req_slot[reset_bank_i];
+                        pipe_bank[0][reset_bank_i] <= s2_bank[reset_bank_i];
+                        pipe_slot[0][reset_bank_i] <= s2_slot[reset_bank_i];
                     end
                 end
             end
@@ -625,19 +935,14 @@ module pixel_tile_cache #(
                 default: fifo_count <= fifo_count;
             endcase
 
-            if (lookup_fire && request_miss) begin
-                pending_tile_x <= missing_tile_x_comb;
-                pending_tile_y <= missing_tile_y_comb;
-                pending_set <= missing_set_comb;
+            if (start_miss) begin
+                pending_tile_x <= s2_missing_tile_x;
+                pending_tile_y <= s2_missing_tile_y;
+                pending_set <= s2_missing_set;
                 pending_way <= selected_way_comb;
                 pending_row <= 0;
-                miss_retry_valid <= 1'b1;
-                miss_retry_x <= decode_x;
-                miss_retry_y <= decode_y;
-                valid_mem[missing_set_comb][selected_way_comb] <= 1'b0;
+                valid_mem[s2_missing_set][selected_way_comb] <= 1'b0;
                 fill_state <= FILL_REQ;
-            end else if (retry_fire) begin
-                miss_retry_valid <= 1'b0;
             end else if ((fill_state == FILL_REQ)
                          && fill_req_valid && fill_req_ready) begin
                 fill_state <= FILL_DATA;
@@ -654,22 +959,25 @@ module pixel_tile_cache #(
                     else
                         touch_lru(pending_set, pending_way);
                     fill_state <= FILL_IDLE;
+                    s2_retry_capture_pending <= 1'b1;
+                    if (s1_tag_valid)
+                        s1_tag_recheck_pending <= 1'b1;
                 end else begin
                     pending_row <= pending_row + 1'b1;
                     fill_state <= FILL_REQ;
                 end
             end
 
-            if (lookup_fire && request_hit)
+            if (s2_fire && request_hit)
                 for (reset_bank_i = 0; reset_bank_i < 4; reset_bank_i = reset_bank_i + 1)
                     if (USE_TREE_PLRU != 0)
-                        plru_state_mem[req_set[reset_bank_i]]
+                        plru_state_mem[s2_set[reset_bank_i]]
                             <= plru_touch_state(
-                                plru_state_mem[req_set[reset_bank_i]],
-                                req_way[reset_bank_i]
+                                plru_state_mem[s2_set[reset_bank_i]],
+                                s2_way[reset_bank_i]
                             );
                     else
-                        touch_lru(req_set[reset_bank_i], req_way[reset_bank_i]);
+                        touch_lru(s2_set[reset_bank_i], s2_way[reset_bank_i]);
         end
     end
 endmodule

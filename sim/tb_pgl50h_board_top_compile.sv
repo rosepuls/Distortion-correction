@@ -23,6 +23,7 @@ module tb_pgl50h_board_top_compile;
     integer input_reset_hold_edges = 0;
     integer core_reset_hold_edges = 0;
     integer video_reset_hold_edges = 0;
+    integer ddr_reset_hold_edges = 0;
 
     always #10 sys_clk = ~sys_clk;
     always #7 pixclk_in = ~pixclk_in;
@@ -46,6 +47,12 @@ module tb_pgl50h_board_top_compile;
             video_reset_hold_edges = 0;
         else if (!dut.video_rst_n)
             video_reset_hold_edges = video_reset_hold_edges + 1;
+    end
+    always @(posedge sys_clk) begin
+        if (!rstn_out)
+            ddr_reset_hold_edges = 0;
+        else if (!dut.ddr_reset_n)
+            ddr_reset_hold_edges = ddr_reset_hold_edges + 1;
     end
 
     pgl50h_board_top #(
@@ -74,14 +81,17 @@ module tb_pgl50h_board_top_compile;
         repeat (30) @(posedge sys_clk);
         if (!rstn_out || !ddr_init_done || !hdmi_int_led)
             $fatal(1, "TEST_FAIL: board initialization outputs did not settle");
-        if (!dut.input_rst_n || !dut.core_rst_n || !dut.video_rst_n)
+        if (!dut.input_rst_n || !dut.core_rst_n || !dut.video_rst_n
+            || !dut.ddr_reset_n)
             $fatal(1, "TEST_FAIL: a synchronized board reset did not release");
         if (input_reset_hold_edges != 2 || core_reset_hold_edges != 2 ||
-            video_reset_hold_edges != 2)
+            video_reset_hold_edges != 2 || ddr_reset_hold_edges != 2)
             $fatal(1,
-                   "TEST_FAIL: reset release edges input=%0d core=%0d video=%0d expected=2",
+                   "TEST_FAIL: reset release edges input=%0d core=%0d video=%0d ddr=%0d expected=2",
                    input_reset_hold_edges, core_reset_hold_edges,
-                   video_reset_hold_edges);
+                   video_reset_hold_edges, ddr_reset_hold_edges);
+        if (mem_rst_n !== dut.ddr_reset_n)
+            $fatal(1, "TEST_FAIL: DDR controller reset is not driven by ddr_reset_n");
         if ($isunknown({pixclk_out,vs_out,hs_out,de_out,r_out,g_out,b_out,
                         mem_rst_n,mem_ck,mem_ck_n,mem_cke,mem_cs_n,mem_ras_n,
                         mem_cas_n,mem_we_n,mem_odt,mem_a,mem_ba,mem_dm,

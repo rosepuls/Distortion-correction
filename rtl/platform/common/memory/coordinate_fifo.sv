@@ -36,22 +36,32 @@ module coordinate_fifo #(
     localparam integer PTR_WIDTH = (DEPTH <= 1) ? 1 : $clog2(DEPTH);
     localparam integer COUNT_WIDTH = (DEPTH <= 1) ? 1 : $clog2(DEPTH + 1);
 
-    reg [COORD_WIDTH-1:0] x0_mem [0:DEPTH-1];
-    reg [COORD_WIDTH-1:0] y0_mem [0:DEPTH-1];
-    reg [FRAC_WIDTH-1:0] fx_mem [0:DEPTH-1];
-    reg [FRAC_WIDTH-1:0] fy_mem [0:DEPTH-1];
-    reg coord_valid_mem [0:DEPTH-1];
-    reg sof_mem [0:DEPTH-1];
-    reg eol_mem [0:DEPTH-1];
+    localparam integer PAYLOAD_WIDTH = (COORD_WIDTH * 2) + (FRAC_WIDTH * 2) + 3;
+
+    // Keep the FIFO payload together so the PDS can infer one synchronous
+    // storage resource instead of seven independent asynchronous LUTRAMs.
+    // The first item is held in head_payload; payload_mem contains the
+    // remaining queued items and is read only into that register.
+    reg [PAYLOAD_WIDTH-1:0] payload_mem [0:DEPTH-1];
+    reg [PAYLOAD_WIDTH-1:0] head_payload;
+    reg head_valid;
 
     reg [PTR_WIDTH-1:0] write_ptr;
     reg [PTR_WIDTH-1:0] read_ptr;
     reg [COUNT_WIDTH-1:0] item_count;
 
-    wire fifo_empty = (item_count == 0);
     wire fifo_full = (item_count == DEPTH);
-    wire dequeue = out_valid && out_ready;
+    wire dequeue = head_valid && out_ready;
     wire enqueue = in_valid && in_ready;
+    wire [PAYLOAD_WIDTH-1:0] in_payload = {
+        in_eol,
+        in_sof,
+        in_coord_valid,
+        in_fy,
+        in_fx,
+        in_y0,
+        in_x0
+    };
 
     // Permit a write on the same cycle as a dequeue when full.  This keeps
     // the scanner from losing one cycle at every cache-service boundary.
@@ -60,15 +70,17 @@ module coordinate_fifo #(
                          : (item_count < DEPTH - RESERVE_SLOTS)
                            || ((item_count == DEPTH - RESERVE_SLOTS)
                                && dequeue);
-    assign out_valid = !fifo_empty;
+    assign out_valid = head_valid;
 
-    assign out_x0 = x0_mem[read_ptr];
-    assign out_y0 = y0_mem[read_ptr];
-    assign out_fx = fx_mem[read_ptr];
-    assign out_fy = fy_mem[read_ptr];
-    assign out_coord_valid = coord_valid_mem[read_ptr];
-    assign out_sof = sof_mem[read_ptr];
-    assign out_eol = eol_mem[read_ptr];
+    assign out_x0 = head_payload[COORD_WIDTH-1:0];
+    assign out_y0 = head_payload[(COORD_WIDTH * 2)-1:COORD_WIDTH];
+    assign out_fx = head_payload[(COORD_WIDTH * 2) + FRAC_WIDTH - 1:
+                                  COORD_WIDTH * 2];
+    assign out_fy = head_payload[(COORD_WIDTH * 2) + (FRAC_WIDTH * 2) - 1:
+                                  (COORD_WIDTH * 2) + FRAC_WIDTH];
+    assign out_coord_valid = head_payload[(COORD_WIDTH * 2) + (FRAC_WIDTH * 2)];
+    assign out_sof = head_payload[(COORD_WIDTH * 2) + (FRAC_WIDTH * 2) + 1];
+    assign out_eol = head_payload[(COORD_WIDTH * 2) + (FRAC_WIDTH * 2) + 2];
 
     function automatic [PTR_WIDTH-1:0] increment_ptr(
         input [PTR_WIDTH-1:0] pointer
@@ -86,20 +98,49 @@ module coordinate_fifo #(
             write_ptr <= {PTR_WIDTH{1'b0}};
             read_ptr <= {PTR_WIDTH{1'b0}};
             item_count <= {COUNT_WIDTH{1'b0}};
+            head_payload <= {PAYLOAD_WIDTH{1'b0}};
+            head_valid <= 1'b0;
         end else begin
-            if (enqueue) begin
-                x0_mem[write_ptr] <= in_x0;
-                y0_mem[write_ptr] <= in_y0;
-                fx_mem[write_ptr] <= in_fx;
-                fy_mem[write_ptr] <= in_fy;
-                coord_valid_mem[write_ptr] <= in_coord_valid;
-                sof_mem[write_ptr] <= in_sof;
-                eol_mem[write_ptr] <= in_eol;
-                write_ptr <= increment_ptr(write_ptr);
+            // When the FIFO is empty, bypass the first write directly into
+            // the output register.  This preserves fall-through behavior
+            // while all subsequent reads use synchronous storage.
+            if (enqueue && !head_valid && (item_count == 0)) begin
+                head_payload <= in_payload;
+                head_valid <= 1'b1;
+            end else if (!head_valid && (item_count != 0)) begin
+                // Defensive prefetch for any state in which queued storage
+                // exists without a valid head.  This is a registered RAM
+                // read and advances the storage read pointer exactly once.
+                head_payload <= payload_mem[read_ptr];
+                head_valid <= 1'b1;
+                read_ptr <= increment_ptr(read_ptr);
+            end else if (dequeue) begin
+                if (item_count > 1) begin
+                    // Registered synchronous read of the next queued item.
+                    // The output remains valid, so a full-rate hit stream has
+                    // no bubble at the head of the FIFO.
+                    head_payload <= payload_mem[read_ptr];
+                    head_valid <= 1'b1;
+                    read_ptr <= increment_ptr(read_ptr);
+                end else if (enqueue) begin
+                    // One item is being consumed and one is arriving.  Keep
+                    // the output register valid without a RAM round trip.
+                    head_payload <= in_payload;
+                    head_valid <= 1'b1;
+                end else begin
+                    head_valid <= 1'b0;
+                end
             end
 
-            if (dequeue)
-                read_ptr <= increment_ptr(read_ptr);
+            // The first item is bypassed into head_payload and must not also
+            // occupy a RAM slot.  Otherwise every later output is delayed by
+            // one item because payload_mem[0] contains a duplicate of item 0.
+            if (enqueue
+                && !(item_count == 0 && !head_valid)
+                && !(dequeue && (item_count == 1))) begin
+                payload_mem[write_ptr] <= in_payload;
+                write_ptr <= increment_ptr(write_ptr);
+            end
 
             case ({enqueue, dequeue})
                 2'b10: item_count <= item_count + 1'b1;

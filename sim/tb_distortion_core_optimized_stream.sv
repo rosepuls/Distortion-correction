@@ -1,8 +1,9 @@
 `timescale 1ns/1ps
 
 module tb_distortion_core_optimized_stream;
-    // The two partial-product stages before Stage 1 add two cycles.
-    localparam integer PIPELINE_LATENCY = 15;
+    // The registered square results, radial-product stage, radial-delta
+    // stage and split Horner multiply/add add six cycles ahead of Stage 1.
+    localparam integer PIPELINE_LATENCY = 19;
     localparam integer DRIVE_CYCLES = 10;
     localparam integer TOTAL_CYCLES = DRIVE_CYCLES + PIPELINE_LATENCY;
 

@@ -104,14 +104,22 @@ module pgl50h_board_top #(
     wire input_rst_n;
     wire core_rst_n;
     wire video_rst_n;
+    // Keep cfg_clk-generated rstn_out off every asynchronous RS pin in the
+    // DDR reset release path.  The synchronous-only two-flop shift register
+    // samples release in sys_clk and therefore presents resetn to the IP only
+    // after two local edges.
+    wire ddr_reset_n;
     wire core_reset_request_n = rstn_out && ddr_init_done;
     mes50hp_reset_sync input_reset_sync (
         .clk(pixclk_in), .reset_n(rstn_out), .rst_n(input_rst_n)
     );
+    mes50hp_reset_sync_sync_only ddr_reset_sync (
+        .clk(sys_clk), .reset_n(rstn_out), .rst_n(ddr_reset_n)
+    );
     mes50hp_reset_sync core_reset_sync (
         .clk(core_clk), .reset_n(core_reset_request_n), .rst_n(core_rst_n)
     );
-    mes50hp_reset_sync video_reset_sync (
+    mes50hp_reset_sync_sync_only video_reset_sync (
         .clk(video_pixel_clk), .reset_n(rstn_out), .rst_n(video_rst_n)
     );
 
@@ -488,7 +496,7 @@ module pgl50h_board_top #(
     );
 
     DDR3_50H ddr3_controller (
-        .ref_clk(sys_clk), .resetn(rstn_out), .ddr_init_done(ddr_init_done),
+        .ref_clk(sys_clk), .resetn(ddr_reset_n), .ddr_init_done(ddr_init_done),
         .ddrphy_clkin(core_clk), .pll_lock(ddr_pll_lock),
         .axi_awaddr(axi_awaddr), .axi_awuser_ap(1'b0), .axi_awuser_id(axi_awid),
         .axi_awlen(axi_awlen), .axi_awready(axi_awready), .axi_awvalid(axi_awvalid),

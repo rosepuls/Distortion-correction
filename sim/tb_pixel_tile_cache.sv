@@ -197,6 +197,359 @@ module tb_pixel_tile_cache;
         end
     endtask
 
+    // A miss must cross separate request-decode and tag-result registers
+    // before it can affect replacement or DDR-fill control.  The three quiet
+    // cycles below are the externally observable contract that prevents the
+    // accepted lookup, address arithmetic, tag probe and victim selection
+    // from collapsing back into one timing path.
+    task automatic lookup_miss_requires_registered_request(
+        input integer x0,
+        input integer y0
+    );
+        integer expected_count;
+        begin
+            before_fill_count = fill_req_count;
+            @(negedge clk);
+            lookup_x0 <= x0;
+            lookup_y0 <= y0;
+            lookup_valid <= 1'b1;
+            while (1) begin
+                @(posedge clk);
+                if (lookup_ready)
+                    break;
+            end
+            #1;
+            if (fill_req_valid) begin
+                $display("FAIL: lookup miss raised fill_req_valid in its acceptance cycle");
+                errors = errors + 1;
+            end
+            @(negedge clk);
+            lookup_valid <= 1'b0;
+
+            for (i = 0; i < 3; i = i + 1) begin
+                @(posedge clk);
+                #1;
+                if (fill_req_valid) begin
+                    $display("FAIL: lookup miss reached fill control before S1/tag/S2 pipeline completed (cycle %0d)", i + 1);
+                    errors = errors + 1;
+                end
+            end
+
+            while (1) begin
+                @(posedge clk);
+                if (lookup_rsp_valid && lookup_rsp_ready)
+                    break;
+            end
+
+            expected_count = before_fill_count + 4;
+            if (fill_req_count != expected_count) begin
+                $display("FAIL: registered miss expected fill count %0d, got %0d",
+                         expected_count, fill_req_count);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    // After S0 is filled, consecutive hits must keep accepting one lookup per
+    // clock and return in request order without a response bubble.
+    task automatic continuous_hit_stream_no_bubble;
+        integer request_x;
+        integer response_x;
+        begin
+            @(negedge clk);
+            lookup_rsp_ready <= 1'b0;
+            for (request_x = 1; request_x <= 3; request_x = request_x + 1) begin
+                @(negedge clk);
+                lookup_x0 <= request_x;
+                lookup_y0 <= 1;
+                lookup_valid <= 1'b1;
+                @(posedge clk);
+                if (!lookup_ready) begin
+                    $display("FAIL: continuous hit %0d was not accepted", request_x);
+                    errors = errors + 1;
+                end
+            end
+            @(negedge clk);
+            lookup_valid <= 1'b0;
+            repeat (4) @(posedge clk);
+
+            @(negedge clk);
+            lookup_rsp_ready <= 1'b1;
+            for (response_x = 1; response_x <= 3; response_x = response_x + 1) begin
+                @(posedge clk);
+                if (!lookup_rsp_valid || !coord_valid || !cache_hit
+                    || pixel_p00 !== source_word(response_x, 1)
+                    || pixel_p10 !== source_word(response_x + 1, 1)
+                    || pixel_p01 !== source_word(response_x, 2)
+                    || pixel_p11 !== source_word(response_x + 1, 2)) begin
+                    $display("FAIL: continuous hit response/bubble at x=%0d", response_x);
+                    errors = errors + 1;
+                end
+            end
+        end
+    endtask
+
+    // If frame invalidation catches a registered S2 hit, the old Tag result
+    // must not survive the set-by-set valid-bit clear.  The held request has
+    // to probe the new frame metadata again and refill before responding.
+    task automatic invalidate_inflight_hit_requires_recheck;
+        integer expected_count;
+        begin
+            before_fill_count = fill_req_count;
+            @(negedge clk);
+            lookup_x0 <= 1;
+            lookup_y0 <= 1;
+            lookup_valid <= 1'b1;
+            while (1) begin
+                @(posedge clk);
+                if (lookup_ready)
+                    break;
+            end
+            @(negedge clk);
+            lookup_valid <= 1'b0;
+
+            // Advance the accepted hit through S0 and S1 into S2, then
+            // invalidate before S2 is allowed to retire.
+            @(posedge clk);
+            @(posedge clk);
+            @(negedge clk);
+            invalidate <= 1'b1;
+            @(negedge clk);
+            invalidate <= 1'b0;
+
+            while (1) begin
+                @(posedge clk);
+                if (lookup_rsp_valid && lookup_rsp_ready)
+                    break;
+            end
+
+            expected_count = before_fill_count + 4;
+            if (fill_req_count != expected_count) begin
+                $display("FAIL: in-flight hit survived invalidate without recheck/refill expected=%0d got=%0d",
+                         expected_count, fill_req_count);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    // invalidate is a pulse without ready/acknowledge.  A pulse arriving
+    // during refill must be remembered, retire the just-filled old-frame Tag,
+    // and force the held request to refill from the new frame.
+    task automatic invalidate_during_refill_is_not_lost;
+        integer expected_count;
+        begin
+            before_fill_count = fill_req_count;
+            @(negedge clk);
+            lookup_x0 <= 33;
+            lookup_y0 <= 1;
+            lookup_valid <= 1'b1;
+            while (1) begin
+                @(posedge clk);
+                if (lookup_ready)
+                    break;
+            end
+            @(negedge clk);
+            lookup_valid <= 1'b0;
+
+            while (1) begin
+                @(posedge clk);
+                if (fill_data_valid && fill_data_ready)
+                    break;
+            end
+            @(negedge clk);
+            frame_id = frame_id + 1;
+            invalidate <= 1'b1;
+            @(negedge clk);
+            invalidate <= 1'b0;
+
+            while (1) begin
+                @(posedge clk);
+                if (lookup_rsp_valid && lookup_rsp_ready) begin
+                    if (!coord_valid || !cache_hit
+                        || pixel_p00 !== source_word(33, 1)
+                        || pixel_p10 !== source_word(34, 1)
+                        || pixel_p01 !== source_word(33, 2)
+                        || pixel_p11 !== source_word(34, 2)) begin
+                        $display("FAIL: invalidate-during-refill returned stale/wrong frame pixels");
+                        errors = errors + 1;
+                    end
+                    break;
+                end
+            end
+
+            expected_count = before_fill_count + 8;
+            if (fill_req_count != expected_count) begin
+                $display("FAIL: invalidate pulse during refill was lost expected=%0d got=%0d",
+                         expected_count, fill_req_count);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    // A younger request may enter S0/S1 before an older request is known to
+    // miss.  Once that miss reaches S2, the younger request must remain held
+    // behind it through DDR command backpressure and refill, then respond
+    // strictly second.
+    task automatic miss_blocks_younger_request_order;
+        integer response_index;
+        integer wait_cycles;
+        begin
+            before_fill_count = fill_req_count;
+            @(negedge clk);
+            lookup_rsp_ready <= 1'b0;
+            fill_req_ready <= 1'b0;
+            lookup_x0 <= 65;
+            lookup_y0 <= 1;
+            lookup_valid <= 1'b1;
+
+            @(posedge clk);
+            if (!lookup_ready) begin
+                $display("FAIL: older miss request was not accepted");
+                errors = errors + 1;
+            end
+
+            @(negedge clk);
+            // This request shares the older miss's Tile.  Its Tag result is
+            // sampled before the fill completes, so it must be re-probed
+            // rather than launch a redundant second fill afterward.
+            lookup_x0 <= 66;
+            lookup_y0 <= 1;
+            @(posedge clk);
+            if (!lookup_ready) begin
+                $display("FAIL: younger request could not enter before miss resolution");
+                errors = errors + 1;
+            end
+            @(negedge clk);
+            lookup_valid <= 1'b0;
+
+            wait_cycles = 0;
+            while (!fill_req_valid && wait_cycles < 20) begin
+                @(posedge clk);
+                wait_cycles = wait_cycles + 1;
+            end
+            if (!fill_req_valid) begin
+                $display("FAIL: older miss did not reach fill control");
+                errors = errors + 1;
+            end
+
+            // Exercise a held fill command while both requests are resident
+            // in the front-end pipeline.
+            repeat (3) @(posedge clk);
+            if (!fill_req_valid) begin
+                $display("FAIL: fill request was not held under backpressure");
+                errors = errors + 1;
+            end
+            @(negedge clk);
+            fill_req_ready <= 1'b1;
+
+            wait_cycles = 0;
+            while (!lookup_rsp_valid && wait_cycles < 200) begin
+                @(posedge clk);
+                wait_cycles = wait_cycles + 1;
+            end
+            if (!lookup_rsp_valid) begin
+                $display("FAIL: ordered miss sequence produced no response");
+                errors = errors + 1;
+            end
+
+            @(negedge clk);
+            lookup_rsp_ready <= 1'b1;
+            response_index = 0;
+            wait_cycles = 0;
+            while (response_index < 2 && wait_cycles < 20) begin
+                @(posedge clk);
+                wait_cycles = wait_cycles + 1;
+                if (lookup_rsp_valid && lookup_rsp_ready) begin
+                    if (response_index == 0) begin
+                        if (!coord_valid || !cache_hit
+                            || pixel_p00 !== source_word(65, 1)
+                            || pixel_p10 !== source_word(66, 1)
+                            || pixel_p01 !== source_word(65, 2)
+                            || pixel_p11 !== source_word(66, 2)) begin
+                            $display("FAIL: younger request overtook older miss");
+                            errors = errors + 1;
+                        end
+                    end else if (!coord_valid || !cache_hit
+                                 || pixel_p00 !== source_word(66, 1)
+                                 || pixel_p10 !== source_word(67, 1)
+                                 || pixel_p01 !== source_word(66, 2)
+                                 || pixel_p11 !== source_word(67, 2)) begin
+                        $display("FAIL: younger shared-Tile response payload/order mismatch");
+                        errors = errors + 1;
+                    end
+                    response_index = response_index + 1;
+                end
+            end
+            if (response_index != 2) begin
+                $display("FAIL: ordered miss sequence returned %0d/2 responses",
+                         response_index);
+                errors = errors + 1;
+            end
+            if (fill_req_count != before_fill_count + 4) begin
+                $display("FAIL: ordered miss sequence expected fill count %0d, got %0d",
+                         before_fill_count + 4, fill_req_count);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    // A completed refill must not feed the held S2 address straight through
+    // the tag comparator and back into S2 metadata on the next cycle.  The
+    // retry address is required to spend one isolated cycle in a dedicated
+    // register before its tag result can arm the Bank read.  This makes the
+    // refill-only control path independently placeable without changing the
+    // steady-state hit pipeline.
+    task automatic refill_recheck_requires_isolation_cycle;
+        integer wait_cycles;
+        begin
+            @(negedge clk);
+            lookup_x0 <= 289;
+            lookup_y0 <= 33;
+            lookup_valid <= 1'b1;
+            while (1) begin
+                @(posedge clk);
+                if (lookup_ready)
+                    break;
+            end
+            @(negedge clk);
+            lookup_valid <= 1'b0;
+
+            wait_cycles = 0;
+            while (!(fill_data_valid && fill_data_ready
+                     && fill_data_row_index == 2'd3
+                     && fill_data_beat_index == 2'd3)
+                   && wait_cycles < 200) begin
+                @(posedge clk);
+                wait_cycles = wait_cycles + 1;
+            end
+            if (wait_cycles == 200) begin
+                $display("FAIL: retry-isolation lookup did not complete its refill");
+                errors = errors + 1;
+            end else begin
+                repeat (3) @(posedge clk);
+                #1;
+                if (lookup_rsp_valid) begin
+                    $display("FAIL: refill retry reached the response pipeline without an isolated retry-address cycle");
+                    errors = errors + 1;
+                end
+
+                wait_cycles = 0;
+                while (!lookup_rsp_valid && wait_cycles < 20) begin
+                    @(posedge clk);
+                    wait_cycles = wait_cycles + 1;
+                end
+                if (!lookup_rsp_valid || !coord_valid || !cache_hit
+                    || pixel_p00 !== source_word(289, 33)
+                    || pixel_p10 !== source_word(290, 33)
+                    || pixel_p01 !== source_word(289, 34)
+                    || pixel_p11 !== source_word(290, 34)) begin
+                    $display("FAIL: retry-isolation lookup returned an invalid response");
+                    errors = errors + 1;
+                end
+            end
+        end
+    endtask
+
     initial begin
         replacement_x[0] = 1; replacement_y[0] = 1;
         replacement_x[1] = 2; replacement_y[1] = 2;
@@ -210,8 +563,15 @@ module tb_pixel_tile_cache;
         repeat (3) @(posedge clk);
         rst_n <= 1'b1;
 
-        // First miss fills one Tile; the next lookup crosses its x boundary.
-        lookup_and_check(1, 1, 1, 4);
+        // First miss fills one Tile; its control must begin only after the
+        // request is captured.  The next lookup is therefore a cache hit.
+        lookup_miss_requires_registered_request(1, 1);
+        lookup_and_check(1, 1, 1, 0);
+        continuous_hit_stream_no_bubble();
+        invalidate_inflight_hit_requires_recheck();
+        invalidate_during_refill_is_not_lost();
+        miss_blocks_younger_request_order();
+        refill_recheck_requires_isolation_cycle();
 
         // Payload RAM is intentionally not reset.  A reset must retire its
         // valid tag, so the first lookup after reset refills from the new

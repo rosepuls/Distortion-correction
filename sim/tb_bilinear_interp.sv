@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
 module tb_bilinear_interp;
+    localparam integer PIPELINE_LATENCY = 4;
     reg clk = 1'b0;
     reg rst_n = 1'b0;
     reg [23:0] p00 = 0, p10 = 0, p01 = 0, p11 = 0;
@@ -29,17 +30,27 @@ module tb_bilinear_interp;
             @(negedge clk);
             p00 = a; p10 = b; p01 = c; p11 = d; dx = fx; dy = fy;
             coord_valid = coordinate_ok; in_valid = 1'b1; in_sof=sof; in_eol=eol;
+            // Present exactly one transaction.  The previous test held
+            // in_valid high while waiting for the result, which hid the
+            // latency contract by injecting repeated identical inputs.
             @(negedge clk);
+            in_valid = 1'b0; in_sof=0; in_eol=0;
             if (out_valid !== 1'b0 || out_sof !== 1'b0 || out_eol !== 1'b0) begin
-                $display("TEST_FAIL: bilinear_interp must not produce data before its second pipeline stage");
+                $display("TEST_FAIL: bilinear_interp produced data before its final pipeline stage");
                 errors = errors + 1;
+            end
+            repeat (PIPELINE_LATENCY - 2) begin
+                @(negedge clk);
+                if (out_valid !== 1'b0 || out_sof !== 1'b0 || out_eol !== 1'b0) begin
+                    $display("TEST_FAIL: bilinear_interp produced data before its final pipeline stage");
+                    errors = errors + 1;
+                end
             end
             @(negedge clk);
             if (!out_valid || out_pixel !== expected || out_sof!==sof || out_eol!==eol) begin
                 $display("TEST_FAIL: bilinear_interp got=%h expected=%h", out_pixel, expected);
                 errors = errors + 1;
             end
-            in_valid = 1'b0; in_sof=0; in_eol=0;
         end
     endtask
 

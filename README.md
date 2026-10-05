@@ -25,6 +25,10 @@ RTL 与自动 Testbench
 - [MES50HP 总体项目计划](docs/plans/mes50hp_project_plan.md)
 - [无板卡阶段推进计划](docs/plans/boardless_development_plan.md)
 
+仿真操作：
+
+- [Vivado XSim / Codex 仿真 SOP](docs/xsim_codex_sop.md)
+
 板卡资料：
 
 - [MES50HP 资源与存储说明](docs/board/mes50hp_resources.md)

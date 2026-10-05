@@ -410,7 +410,7 @@
         </param>
         <param>
             <name>CLKOUT0_REQ_FREQ_basicPage</name>
-            <value>74.2500</value>
+            <value>37.1250</value>
             <decimal>4</decimal>
         </param>
         <param>
@@ -587,7 +587,7 @@
         </param>
         <param>
             <name>STATIC_RATIO0_basicPage</name>
-            <value>11</value>
+            <value>22</value>
         </param>
         <param>
             <name>CLKSWITCH_FLAG_ENABLE_basicPage</name>

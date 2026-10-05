@@ -94,12 +94,17 @@ module cached_pixel_fetch_engine #(
     assign cache_rsp_ready = (meta_count != 0);
     wire cache_response_fire = cache_rsp_valid && cache_rsp_ready;
 
-    wire [15:0] interp_fx = (meta_count != 0) ? meta_fx[meta_rd_ptr] : 16'd0;
-    wire [15:0] interp_fy = (meta_count != 0) ? meta_fy[meta_rd_ptr] : 16'd0;
-    wire [23:0] interp_p00 = cache_response_fire ? cache_p00[31:8] : 24'd0;
-    wire [23:0] interp_p10 = cache_response_fire ? cache_p10[31:8] : 24'd0;
-    wire [23:0] interp_p01 = cache_response_fire ? cache_p01[31:8] : 24'd0;
-    wire [23:0] interp_p11 = cache_response_fire ? cache_p11[31:8] : 24'd0;
+    // cache_response_fire is the only validity qualifier for the
+    // interpolation payload.  A response fire requires a metadata entry, so
+    // its head is valid on every observable interpolation cycle.  Leave the
+    // payload ungated in idle cycles: zero-filling it with meta_count/fire
+    // would put the metadata-empty comparator on the wide pixel-data path.
+    wire [15:0] interp_fx = meta_fx[meta_rd_ptr];
+    wire [15:0] interp_fy = meta_fy[meta_rd_ptr];
+    wire [23:0] interp_p00 = cache_p00[31:8];
+    wire [23:0] interp_p10 = cache_p10[31:8];
+    wire [23:0] interp_p01 = cache_p01[31:8];
+    wire [23:0] interp_p11 = cache_p11[31:8];
     wire bilinear_out_sof;
     wire bilinear_out_eol;
     assign out_sof = bilinear_out_sof;
@@ -153,10 +158,10 @@ module cached_pixel_fetch_engine #(
         .p00(interp_p00), .p10(interp_p10), .p01(interp_p01), .p11(interp_p11),
         .dx(interp_fx), .dy(interp_fy),
         .coord_valid(cache_response_fire && cache_coord_valid
-                     && ((meta_count != 0) ? meta_coord_valid[meta_rd_ptr] : 1'b0)),
+                     && meta_coord_valid[meta_rd_ptr]),
         .in_valid(cache_response_fire),
-        .in_sof((meta_count != 0) ? meta_sof[meta_rd_ptr] : 1'b0),
-        .in_eol((meta_count != 0) ? meta_eol[meta_rd_ptr] : 1'b0),
+        .in_sof(meta_sof[meta_rd_ptr]),
+        .in_eol(meta_eol[meta_rd_ptr]),
         .out_pixel(out_pixel), .out_valid(out_valid),
         .out_sof(bilinear_out_sof), .out_eol(bilinear_out_eol)
     );

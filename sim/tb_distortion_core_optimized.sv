@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 module tb_distortion_core_optimized;
- // 归一化乘法采用两级部分积流水后，可见延迟固定为 15 拍。
- localparam L=15; reg clk=0,rst_n=0,in_valid=0,in_sof=0,in_eol=0; reg [12:0] in_u=0,in_v=0;
+ // 径向乘积寄存后，可见延迟固定为 19 拍。
+ localparam L=19; reg clk=0,rst_n=0,in_valid=0,in_sof=0,in_eol=0; reg [12:0] in_u=0,in_v=0;
  reg signed [31:0] cfg_fx_q19,cfg_fy_q19,cfg_cx_q19,cfg_cy_q19,cfg_inv_fx_q30,cfg_inv_fy_q30,cfg_k1_q28,cfg_k2_q28,cfg_p1_q28,cfg_p2_q28;
  wire signed [63:0] out_src_x_q19,out_src_y_q19; wire signed [31:0] out_x0,out_y0; wire [15:0] out_dx_q16,out_dy_q16; wire out_coord_valid,out_valid,out_sof,out_eol;
  integer err=0,vector_count=0,fd,n,u,v,s,e,id,x,y,x0,y0,dx,dy,ok; reg [8*128-1:0] hdr; always #5 clk=~clk;

@@ -205,7 +205,27 @@ module distortion_core_optimized #(
     reg signed [23:0] stage1_cx_q12;
     reg signed [23:0] stage1_cy_q12;
 
-    // These two radial-polynomial pipeline boundaries must remain physical
+    // Stage 2S holds the quantized squared terms before their radius sum.
+    // Keeping this physical boundary prevents PDS from joining an APM square,
+    // saturation and x2+y2 carry chain in one 100 MHz cycle.
+    reg stage2s_valid /* synthesis syn_preserve = 1 */;
+    reg stage2s_sof /* synthesis syn_preserve = 1 */;
+    reg stage2s_eol /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2s_x_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2s_y_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2s_x2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2s_y2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2s_xy_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2s_k1_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2s_k2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2s_p1_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2s_p2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage2s_fx_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage2s_fy_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage2s_cx_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage2s_cy_q12 /* synthesis syn_preserve = 1 */;
+
+    // These radial-polynomial pipeline boundaries must remain physical
     // registers.  PDS otherwise retimes them through the multiplier inputs
     // and recreates an x2/r2/Horner combinational chain at 100 MHz.
     reg stage2_valid /* synthesis syn_preserve = 1 */;
@@ -226,9 +246,30 @@ module distortion_core_optimized #(
     reg signed [23:0] stage2_cx_q12 /* synthesis syn_preserve = 1 */;
     reg signed [23:0] stage2_cy_q12 /* synthesis syn_preserve = 1 */;
 
+    // Stage 2K captures the quantized k2*r2 term.  Keeping this multiplier
+    // result separate from the Horner add prevents the physical mapper from
+    // rebuilding the full k2*r2 -> saturate -> k1+term cone in one cycle.
+    reg stage2k_valid /* synthesis syn_preserve = 1 */;
+    reg stage2k_sof /* synthesis syn_preserve = 1 */;
+    reg stage2k_eol /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2k_x_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2k_y_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2k_x2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2k_y2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2k_xy_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2k_r2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2k_k1_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [20:0] stage2k_k2_radius_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2k_p1_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage2k_p2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage2k_fx_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage2k_fy_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage2k_cx_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage2k_cy_q12 /* synthesis syn_preserve = 1 */;
+
     // Stage 2H holds the Horner result before the second radial multiply.
-    // This prevents k2*r2, Horner addition, and r2*Horner from becoming one
-    // long combinational chain.
+    // The extra 2K boundary keeps the Horner add and r2*Horner multiplier
+    // independently placeable at the target 100 MHz clock.
     reg stage2h_valid /* synthesis syn_preserve = 1 */;
     reg stage2h_sof /* synthesis syn_preserve = 1 */;
     reg stage2h_eol /* synthesis syn_preserve = 1 */;
@@ -245,6 +286,46 @@ module distortion_core_optimized #(
     reg signed [23:0] stage2h_fy_q12 /* synthesis syn_preserve = 1 */;
     reg signed [23:0] stage2h_cx_q12 /* synthesis syn_preserve = 1 */;
     reg signed [23:0] stage2h_cy_q12 /* synthesis syn_preserve = 1 */;
+
+    // Stage 3P holds the full-precision radial product.  This creates a
+    // hard boundary between the second radial APM multiplier and the Q18
+    // quantization/saturation logic that follows it.
+    reg stage3p_valid /* synthesis syn_preserve = 1 */;
+    reg stage3p_sof /* synthesis syn_preserve = 1 */;
+    reg stage3p_eol /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3p_x_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3p_y_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3p_x2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3p_y2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3p_xy_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3p_r2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [40:0] stage3p_radial_product /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3p_p1_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3p_p2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage3p_fx_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage3p_fy_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage3p_cx_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage3p_cy_q12 /* synthesis syn_preserve = 1 */;
+
+    // Stage 3D holds the quantized radial delta before adding the Q18 unity
+    // term.  This keeps product quantization, unity addition and radial
+    // saturation in independently placeable pipeline stages.
+    reg stage3d_valid /* synthesis syn_preserve = 1 */;
+    reg stage3d_sof /* synthesis syn_preserve = 1 */;
+    reg stage3d_eol /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3d_x_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3d_y_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3d_x2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3d_y2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3d_xy_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3d_r2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [20:0] stage3d_radial_delta_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3d_p1_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [19:0] stage3d_p2_q18 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage3d_fx_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage3d_fy_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage3d_cx_q12 /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage3d_cy_q12 /* synthesis syn_preserve = 1 */;
 
     reg stage3_valid;
     reg stage3_sof;
@@ -370,22 +451,21 @@ module distortion_core_optimized #(
         saturate_s20($signed(y_squared_product) >>> 18);
     wire signed [19:0] xy_q18 = saturate_s20($signed(xy_product) >>> 18);
     wire signed [63:0] radius_sum_q18 =
-        {{44{x_squared_q18[19]}}, x_squared_q18} +
-        {{44{y_squared_q18[19]}}, y_squared_q18};
-    wire signed [19:0] radius_squared_q18 = saturate_s20(radius_sum_q18);
+        {{44{stage2s_x2_q18[19]}}, stage2s_x2_q18} +
+        {{44{stage2s_y2_q18[19]}}, stage2s_y2_q18};
 
     wire signed [39:0] k2_radius_product = stage2_k2_q18 * stage2_r2_q18;
     wire signed [20:0] k2_radius_q18 =
         saturate_s21($signed(k2_radius_product) >>> 18);
     wire signed [63:0] horner_sum_q18 =
-        {{44{stage2_k1_q18[19]}}, stage2_k1_q18} +
-        {{43{k2_radius_q18[20]}}, k2_radius_q18};
+        {{44{stage2k_k1_q18[19]}}, stage2k_k1_q18} +
+        {{43{stage2k_k2_radius_q18[20]}}, stage2k_k2_radius_q18};
     wire signed [20:0] horner_t_q18 = saturate_s21(horner_sum_q18);
     wire signed [40:0] radial_product = stage2h_r2_q18 * stage2h_horner_t_q18;
     wire signed [20:0] radial_delta_q18 =
-        saturate_s21($signed(radial_product) >>> 18);
+        saturate_s21($signed(stage3p_radial_product) >>> 18);
     wire signed [63:0] radial_sum_q18 =
-        64'sd262144 + {{43{radial_delta_q18[20]}}, radial_delta_q18};
+        64'sd262144 + {{43{stage3d_radial_delta_q18[20]}}, stage3d_radial_delta_q18};
     wire signed [20:0] radial_q18 = saturate_s21(radial_sum_q18);
 
     wire signed [40:0] radial_x_product = stage3_x_q18 * stage3_radial_q18;
@@ -487,12 +567,24 @@ module distortion_core_optimized #(
             stage1_valid <= 1'b0;
             stage1_sof <= 1'b0;
             stage1_eol <= 1'b0;
+            stage2s_valid <= 1'b0;
+            stage2s_sof <= 1'b0;
+            stage2s_eol <= 1'b0;
             stage2_valid <= 1'b0;
             stage2_sof <= 1'b0;
             stage2_eol <= 1'b0;
+            stage2k_valid <= 1'b0;
+            stage2k_sof <= 1'b0;
+            stage2k_eol <= 1'b0;
             stage2h_valid <= 1'b0;
             stage2h_sof <= 1'b0;
             stage2h_eol <= 1'b0;
+            stage3p_valid <= 1'b0;
+            stage3p_sof <= 1'b0;
+            stage3p_eol <= 1'b0;
+            stage3d_valid <= 1'b0;
+            stage3d_sof <= 1'b0;
+            stage3d_eol <= 1'b0;
             stage3_valid <= 1'b0;
             stage3_sof <= 1'b0;
             stage3_eol <= 1'b0;
@@ -662,57 +754,138 @@ module distortion_core_optimized #(
             stage4_cx_q12 <= stage3_cx_q12;
             stage4_cy_q12 <= stage3_cy_q12;
 
-            stage3_valid <= stage2h_valid;
-            stage3_sof <= stage2h_sof;
-            stage3_eol <= stage2h_eol;
-            stage3_x_q18 <= stage2h_x_q18;
-            stage3_y_q18 <= stage2h_y_q18;
-            stage3_x2_q18 <= stage2h_x2_q18;
-            stage3_y2_q18 <= stage2h_y2_q18;
-            stage3_xy_q18 <= stage2h_xy_q18;
-            stage3_r2_q18 <= stage2h_r2_q18;
+            // Stage 3: add the registered radial delta to unity and saturate.
+            stage3_valid <= stage3d_valid;
+            stage3_sof <= stage3d_sof;
+            stage3_eol <= stage3d_eol;
+            stage3_x_q18 <= stage3d_x_q18;
+            stage3_y_q18 <= stage3d_y_q18;
+            stage3_x2_q18 <= stage3d_x2_q18;
+            stage3_y2_q18 <= stage3d_y2_q18;
+            stage3_xy_q18 <= stage3d_xy_q18;
+            stage3_r2_q18 <= stage3d_r2_q18;
             stage3_radial_q18 <= radial_q18;
-            stage3_p1_q18 <= stage2h_p1_q18;
-            stage3_p2_q18 <= stage2h_p2_q18;
-            stage3_fx_q12 <= stage2h_fx_q12;
-            stage3_fy_q12 <= stage2h_fy_q12;
-            stage3_cx_q12 <= stage2h_cx_q12;
-            stage3_cy_q12 <= stage2h_cy_q12;
+            stage3_p1_q18 <= stage3d_p1_q18;
+            stage3_p2_q18 <= stage3d_p2_q18;
+            stage3_fx_q12 <= stage3d_fx_q12;
+            stage3_fy_q12 <= stage3d_fy_q12;
+            stage3_cx_q12 <= stage3d_cx_q12;
+            stage3_cy_q12 <= stage3d_cy_q12;
 
-            stage2h_valid <= stage2_valid;
-            stage2h_sof <= stage2_sof;
-            stage2h_eol <= stage2_eol;
-            stage2h_x_q18 <= stage2_x_q18;
-            stage2h_y_q18 <= stage2_y_q18;
-            stage2h_x2_q18 <= stage2_x2_q18;
-            stage2h_y2_q18 <= stage2_y2_q18;
-            stage2h_xy_q18 <= stage2_xy_q18;
-            stage2h_r2_q18 <= stage2_r2_q18;
+            // Stage 3D: quantize the registered radial product while
+            // delaying every mathematical and control field.
+            stage3d_valid <= stage3p_valid;
+            stage3d_sof <= stage3p_sof;
+            stage3d_eol <= stage3p_eol;
+            stage3d_x_q18 <= stage3p_x_q18;
+            stage3d_y_q18 <= stage3p_y_q18;
+            stage3d_x2_q18 <= stage3p_x2_q18;
+            stage3d_y2_q18 <= stage3p_y2_q18;
+            stage3d_xy_q18 <= stage3p_xy_q18;
+            stage3d_r2_q18 <= stage3p_r2_q18;
+            stage3d_radial_delta_q18 <= radial_delta_q18;
+            stage3d_p1_q18 <= stage3p_p1_q18;
+            stage3d_p2_q18 <= stage3p_p2_q18;
+            stage3d_fx_q12 <= stage3p_fx_q12;
+            stage3d_fy_q12 <= stage3p_fy_q12;
+            stage3d_cx_q12 <= stage3p_cx_q12;
+            stage3d_cy_q12 <= stage3p_cy_q12;
+
+            // Stage 3P: register r2*Horner before its Q18 quantization.
+            stage3p_valid <= stage2h_valid;
+            stage3p_sof <= stage2h_sof;
+            stage3p_eol <= stage2h_eol;
+            stage3p_x_q18 <= stage2h_x_q18;
+            stage3p_y_q18 <= stage2h_y_q18;
+            stage3p_x2_q18 <= stage2h_x2_q18;
+            stage3p_y2_q18 <= stage2h_y2_q18;
+            stage3p_xy_q18 <= stage2h_xy_q18;
+            stage3p_r2_q18 <= stage2h_r2_q18;
+            stage3p_radial_product <= radial_product;
+            stage3p_p1_q18 <= stage2h_p1_q18;
+            stage3p_p2_q18 <= stage2h_p2_q18;
+            stage3p_fx_q12 <= stage2h_fx_q12;
+            stage3p_fy_q12 <= stage2h_fy_q12;
+            stage3p_cx_q12 <= stage2h_cx_q12;
+            stage3p_cy_q12 <= stage2h_cy_q12;
+
+            // Stage 2H: the short Horner add/saturate runs only from the
+            // registered Stage 2K operands.
+            stage2h_valid <= stage2k_valid;
+            stage2h_sof <= stage2k_sof;
+            stage2h_eol <= stage2k_eol;
+            stage2h_x_q18 <= stage2k_x_q18;
+            stage2h_y_q18 <= stage2k_y_q18;
+            stage2h_x2_q18 <= stage2k_x2_q18;
+            stage2h_y2_q18 <= stage2k_y2_q18;
+            stage2h_xy_q18 <= stage2k_xy_q18;
+            stage2h_r2_q18 <= stage2k_r2_q18;
             stage2h_horner_t_q18 <= horner_t_q18;
-            stage2h_p1_q18 <= stage2_p1_q18;
-            stage2h_p2_q18 <= stage2_p2_q18;
-            stage2h_fx_q12 <= stage2_fx_q12;
-            stage2h_fy_q12 <= stage2_fy_q12;
-            stage2h_cx_q12 <= stage2_cx_q12;
-            stage2h_cy_q12 <= stage2_cy_q12;
+            stage2h_p1_q18 <= stage2k_p1_q18;
+            stage2h_p2_q18 <= stage2k_p2_q18;
+            stage2h_fx_q12 <= stage2k_fx_q12;
+            stage2h_fy_q12 <= stage2k_fy_q12;
+            stage2h_cx_q12 <= stage2k_cx_q12;
+            stage2h_cy_q12 <= stage2k_cy_q12;
 
-            stage2_valid <= stage1_valid;
-            stage2_sof <= stage1_sof;
-            stage2_eol <= stage1_eol;
-            stage2_x_q18 <= stage1_x_q18;
-            stage2_y_q18 <= stage1_y_q18;
-            stage2_x2_q18 <= x_squared_q18;
-            stage2_y2_q18 <= y_squared_q18;
-            stage2_xy_q18 <= xy_q18;
-            stage2_r2_q18 <= radius_squared_q18;
-            stage2_k1_q18 <= stage1_k1_q18;
-            stage2_k2_q18 <= stage1_k2_q18;
-            stage2_p1_q18 <= stage1_p1_q18;
-            stage2_p2_q18 <= stage1_p2_q18;
-            stage2_fx_q12 <= stage1_fx_q12;
-            stage2_fy_q12 <= stage1_fy_q12;
-            stage2_cx_q12 <= stage1_cx_q12;
-            stage2_cy_q12 <= stage1_cy_q12;
+            // Stage 2K: isolate k2*r2 and its quantization from the Horner
+            // addition while delaying every mathematical and control field.
+            stage2k_valid <= stage2_valid;
+            stage2k_sof <= stage2_sof;
+            stage2k_eol <= stage2_eol;
+            stage2k_x_q18 <= stage2_x_q18;
+            stage2k_y_q18 <= stage2_y_q18;
+            stage2k_x2_q18 <= stage2_x2_q18;
+            stage2k_y2_q18 <= stage2_y2_q18;
+            stage2k_xy_q18 <= stage2_xy_q18;
+            stage2k_r2_q18 <= stage2_r2_q18;
+            stage2k_k1_q18 <= stage2_k1_q18;
+            stage2k_k2_radius_q18 <= k2_radius_q18;
+            stage2k_p1_q18 <= stage2_p1_q18;
+            stage2k_p2_q18 <= stage2_p2_q18;
+            stage2k_fx_q12 <= stage2_fx_q12;
+            stage2k_fy_q12 <= stage2_fy_q12;
+            stage2k_cx_q12 <= stage2_cx_q12;
+            stage2k_cy_q12 <= stage2_cy_q12;
+
+            // Stage 2: sum the registered squares and carry all fields into
+            // the radial-polynomial pipeline.
+            stage2_valid <= stage2s_valid;
+            stage2_sof <= stage2s_sof;
+            stage2_eol <= stage2s_eol;
+            stage2_x_q18 <= stage2s_x_q18;
+            stage2_y_q18 <= stage2s_y_q18;
+            stage2_x2_q18 <= stage2s_x2_q18;
+            stage2_y2_q18 <= stage2s_y2_q18;
+            stage2_xy_q18 <= stage2s_xy_q18;
+            stage2_r2_q18 <= saturate_s20(radius_sum_q18);
+            stage2_k1_q18 <= stage2s_k1_q18;
+            stage2_k2_q18 <= stage2s_k2_q18;
+            stage2_p1_q18 <= stage2s_p1_q18;
+            stage2_p2_q18 <= stage2s_p2_q18;
+            stage2_fx_q12 <= stage2s_fx_q12;
+            stage2_fy_q12 <= stage2s_fy_q12;
+            stage2_cx_q12 <= stage2s_cx_q12;
+            stage2_cy_q12 <= stage2s_cy_q12;
+
+            // Stage 2S: isolate square products and their quantization from
+            // the radius carry chain.
+            stage2s_valid <= stage1_valid;
+            stage2s_sof <= stage1_sof;
+            stage2s_eol <= stage1_eol;
+            stage2s_x_q18 <= stage1_x_q18;
+            stage2s_y_q18 <= stage1_y_q18;
+            stage2s_x2_q18 <= x_squared_q18;
+            stage2s_y2_q18 <= y_squared_q18;
+            stage2s_xy_q18 <= xy_q18;
+            stage2s_k1_q18 <= stage1_k1_q18;
+            stage2s_k2_q18 <= stage1_k2_q18;
+            stage2s_p1_q18 <= stage1_p1_q18;
+            stage2s_p2_q18 <= stage1_p2_q18;
+            stage2s_fx_q12 <= stage1_fx_q12;
+            stage2s_fy_q12 <= stage1_fy_q12;
+            stage2s_cx_q12 <= stage1_cx_q12;
+            stage2s_cy_q12 <= stage1_cy_q12;
 
             // Stage 1C: finish center subtraction and quantize the inverse
             // focal values before the normalized-coordinate multipliers.

@@ -26,13 +26,13 @@ module pll (
 
     localparam real CLKIN_FREQ          = 50.0;
     localparam integer STATIC_RATIOI    = 3;
-    localparam integer STATIC_RATIO0    = 11;
+    localparam integer STATIC_RATIO0    = 22;
     localparam integer STATIC_RATIO1    = 82;
     localparam integer STATIC_RATIO2    = 33;
     localparam integer STATIC_RATIO3    = 16;
     localparam integer STATIC_RATIO4    = 16;
     localparam integer STATIC_RATIOF    = 49;
-    localparam integer STATIC_DUTY0     = 11;
+    localparam integer STATIC_DUTY0     = 22;
     localparam integer STATIC_DUTY1     = 82;
     localparam integer STATIC_DUTY2     = 33;
     localparam integer STATIC_DUTY3     = 16;
