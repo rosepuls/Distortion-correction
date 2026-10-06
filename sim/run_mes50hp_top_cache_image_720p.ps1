@@ -13,6 +13,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$vivadoRoot = 'D:\Xilinx\Vivado\2020.2'
 $resultDirectory = Join-Path $projectRoot "result\sim_assets\cache_full_chain_1280x720"
 $runDirectory = Join-Path $projectRoot "xsim.dir\mes50hp_top_cache_image_1280x720"
 $cleanPng = Join-Path $resultDirectory "clean_reference_1280x720.png"
@@ -50,7 +51,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Push-Location $runDirectory
 try {
-    & xvlog -sv -d CACHE_IMAGE_720P -d "CACHE_WAYS_$CacheWays" -d "EXPECT_CACHE_WAYS_$CacheWays" `
+    & (Join-Path $vivadoRoot 'bin\xvlog.bat') -sv -d CACHE_IMAGE_720P -d "CACHE_WAYS_$CacheWays" -d "EXPECT_CACHE_WAYS_$CacheWays" `
         -d "TILE_CACHE_SETS_$CacheSets" `
         (Join-Path $projectRoot "rtl\algorithm\distortion\coordinate_gen.sv") `
         (Join-Path $projectRoot "rtl\algorithm\distortion\normalize.sv") `
@@ -71,10 +72,10 @@ try {
         (Join-Path $projectRoot "sim\tb_mes50hp_top_cache_image.sv")
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    & xelab tb_mes50hp_top_cache_image -s mes50hp_top_cache_image_720p_sim
+    & (Join-Path $vivadoRoot 'bin\xelab.bat') tb_mes50hp_top_cache_image -s mes50hp_top_cache_image_720p_sim
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    $xsimOutput = & xsim mes50hp_top_cache_image_720p_sim -runall 2>&1
+    $xsimOutput = & (Join-Path $vivadoRoot 'bin\xsim.bat') mes50hp_top_cache_image_720p_sim -R 2>&1
     $xsimExitCode = $LASTEXITCODE
     $xsimOutput | Write-Output
     if ($xsimExitCode -ne 0) { exit $xsimExitCode }

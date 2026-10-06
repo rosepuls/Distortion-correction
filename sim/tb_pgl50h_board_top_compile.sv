@@ -24,6 +24,7 @@ module tb_pgl50h_board_top_compile;
     integer core_reset_hold_edges = 0;
     integer video_reset_hold_edges = 0;
     integer ddr_reset_hold_edges = 0;
+    integer process_start_count = 0;
 
     always #10 sys_clk = ~sys_clk;
     always #7 pixclk_in = ~pixclk_in;
@@ -53,6 +54,10 @@ module tb_pgl50h_board_top_compile;
             ddr_reset_hold_edges = 0;
         else if (!dut.ddr_reset_n)
             ddr_reset_hold_edges = ddr_reset_hold_edges + 1;
+    end
+    always @(posedge dut.core_clk) begin
+        if (dut.algo_frame_start)
+            process_start_count = process_start_count + 1;
     end
 
     pgl50h_board_top #(
@@ -104,10 +109,35 @@ module tb_pgl50h_board_top_compile;
             $fatal(1, "TEST_FAIL: X/Z on driven board outputs");
         end
 
+        // Two completed input frames must launch two separate jobs.  The
+        // first job is explicitly completed before the second arrives so this
+        // checks continuous operation rather than the scheduler overrun flag.
+        force dut.input_frame_complete = 1'b1;
+        @(posedge dut.core_clk);
+        #1;
+        release dut.input_frame_complete;
+        repeat (2) @(posedge dut.core_clk);
+        if (process_start_count != 1 || !dut.process_enable)
+            $fatal(1, "TEST_FAIL: first captured frame did not start processing");
+        force dut.algo_frame_done = 1'b1;
+        force dut.output_frame_complete = 1'b1;
+        @(posedge dut.core_clk);
+        #1;
+        release dut.algo_frame_done;
+        release dut.output_frame_complete;
+        repeat (2) @(posedge dut.core_clk);
+        if (dut.process_enable || !dut.display_enable)
+            $fatal(1, "TEST_FAIL: completed first frame did not enable display");
+        force dut.input_frame_complete = 1'b1;
+        @(posedge dut.core_clk);
+        #1;
+        release dut.input_frame_complete;
+        repeat (2) @(posedge dut.core_clk);
+        if (process_start_count != 2 || !dut.process_enable || !dut.display_enable)
+            $fatal(1, "TEST_FAIL: continuous second frame did not process while display stayed enabled");
         // The throughput path must enter the board through the Tile Cache
         // command port, retain byte addressing in the portable core, then
         // convert to the official controller's 32-bit-word address here.
-        force dut.process_enable = 1'b1;
         force dut.input_frame_base = 28'h0200000;
         force dut.cache_rd_cmd_en = 1'b1;
         force dut.cache_rd_cmd_addr = 32'h0000_0080;
@@ -121,7 +151,6 @@ module tb_pgl50h_board_top_compile;
         release dut.cache_rd_cmd_addr;
         release dut.cache_rd_cmd_len;
         release dut.input_frame_base;
-        release dut.process_enable;
         $display("TEST_PASS: pgl50h_board_top_compile");
         $finish;
     end

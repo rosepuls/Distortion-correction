@@ -11,6 +11,7 @@ module tb_ddr3_frame_reader;
     reg display_enable = 1'b0;
     reg rd_fsync = 1'b0;
     reg rd_en = 1'b0;
+    reg [27:0] frame_base_addr = FRAME_BASE_ADDR;
     wire vout_de;
     wire [23:0] vout_data;
     wire underflow;
@@ -49,6 +50,7 @@ module tb_ddr3_frame_reader;
         .display_enable(display_enable),
         .rd_fsync(rd_fsync),
         .rd_en(rd_en),
+        .frame_base_addr(frame_base_addr),
         .vout_de(vout_de),
         .vout_data(vout_data),
         .underflow(underflow),
@@ -153,6 +155,9 @@ module tb_ddr3_frame_reader;
         rd_fsync <= 1'b0;
 
         repeat (30) @(posedge pixel_clk);
+        // The pending display-bank selection may change during a frame.  The
+        // second line must still come from the base sampled at frame start.
+        frame_base_addr <= FRAME_BASE_ADDR + 28'h0010000;
         drive_active_line();
         drive_active_line();
         repeat (8) @(posedge pixel_clk);

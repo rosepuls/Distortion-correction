@@ -14,6 +14,9 @@ module algorithm_frame_writer #(
     input wire clk, input wire rst_n,
     input wire pixel_valid, input wire [23:0] pixel_data,
     input wire pixel_sof, input wire pixel_eol,
+    // Sampled on pixel_sof so a software-visible base update cannot split
+    // one output frame across two DDR regions.
+    input wire [DDR_ADDR_WIDTH-1:0] frame_base_addr,
     output reg overflow, output reg frame_complete,
     output reg wr_cmd_en, output reg [DDR_ADDR_WIDTH-1:0] wr_cmd_addr,
     output wire [31:0] wr_cmd_len, input wire wr_cmd_ready,
@@ -36,6 +39,7 @@ module algorithm_frame_writer #(
     reg [LINE_INDEX_WIDTH-1:0] fill_line_index;
     reg [1:0] pixel_mod4;
     reg [23:0] previous_pixel;
+    reg [DDR_ADDR_WIDTH-1:0] active_frame_base;
 
     reg bank_write_en, bank_write_sel;
     reg [WORD_INDEX_WIDTH-1:0] bank_write_addr;
@@ -124,6 +128,7 @@ module algorithm_frame_writer #(
             bank_line0 <= 0; bank_line1 <= 0;
             fill_bank <= 0; fill_word_index <= 0; fill_line_index <= 0;
             pixel_mod4 <= 0; previous_pixel <= 0;
+            active_frame_base <= OUTPUT_BASE_ADDR;
             bank_write_en <= 0; bank_write_sel <= 0; bank_write_addr <= 0; bank_write_data <= 0;
             drain_state <= 0; drain_bank <= 0; drain_beat_index <= 0;
             wr_cmd_en <= 0; wr_cmd_addr <= OUTPUT_BASE_ADDR;
@@ -137,6 +142,7 @@ module algorithm_frame_writer #(
                 if (bank_full[fill_bank]) begin
                     overflow <= 1'b1;
                 end else if (pixel_sof) begin
+                    active_frame_base <= frame_base_addr;
                     fill_line_index <= 0;
                     fill_word_index <= 0;
                     pixel_mod4 <= 2'd1;
@@ -172,10 +178,11 @@ module algorithm_frame_writer #(
 
             if (!drain_state) begin
                 drain_beat_index <= 0;
-                if (bank_full[drain_bank] && wr_cmd_ready) begin
-                    wr_cmd_addr <= OUTPUT_BASE_ADDR + selected_line * WORDS_PER_LINE;
+                if (bank_full[drain_bank]) begin
+                    wr_cmd_addr <= active_frame_base + selected_line * WORDS_PER_LINE;
                     wr_cmd_en <= 1'b1;
-                    drain_state <= 1'b1;
+                    if (wr_cmd_ready)
+                        drain_state <= 1'b1;
                 end
             end else begin
                 if (wr_bac && (drain_beat_index != 0))

@@ -1,8 +1,9 @@
 `timescale 1ns/1ps
 
 // Physical MES50HP / PGL50H top.
-// Bring-up flow: capture one MS7200 frame -> correct it -> store the corrected
-// frame -> continuously display it through MS7210 until reset.
+// Continuous pipeline: capture frame N while correcting frame N-1 and
+// displaying the most recently completed output frame.  Input and output use
+// independent ping-pong regions so no reader sees a frame being overwritten.
 module pgl50h_board_top #(
     parameter integer IMAGE_WIDTH = 1280,
     parameter integer IMAGE_HEIGHT = 720,
@@ -68,8 +69,14 @@ module pgl50h_board_top #(
     output reg                          heart_beat_led
 );
     localparam integer CTRL_ADDR_WIDTH = MEM_ROW_ADDR_WIDTH + MEM_BADDR_WIDTH + MEM_COL_ADDR_WIDTH;
-    localparam [CTRL_ADDR_WIDTH-1:0] OUTPUT_FRAME_BASE =
+    localparam [CTRL_ADDR_WIDTH-1:0] INPUT_FRAME_BASE0 = {CTRL_ADDR_WIDTH{1'b0}};
+    localparam [CTRL_ADDR_WIDTH-1:0] INPUT_FRAME_BASE1 =
+        ({{(CTRL_ADDR_WIDTH-1){1'b0}},1'b1} << 22);
+    localparam [CTRL_ADDR_WIDTH-1:0] OUTPUT_FRAME_BASE0 =
         ({{(CTRL_ADDR_WIDTH-1){1'b0}},1'b1} << 23);
+    localparam integer OUTPUT_FRAME_WORDS = (IMAGE_WIDTH * 24 / 32) * IMAGE_HEIGHT;
+    localparam [CTRL_ADDR_WIDTH-1:0] OUTPUT_FRAME_BASE1 =
+        OUTPUT_FRAME_BASE0 + OUTPUT_FRAME_WORDS;
 
     wire video_pixel_clk;
     wire cfg_clk;
@@ -135,7 +142,8 @@ module pgl50h_board_top #(
     assign hdmi_int_led = hdmi_init_done;
     assign pixclk_out = video_pixel_clk;
 
-    wire capture_enable;
+    wire pipeline_ready = ddr_init_done && hdmi_init_done;
+    wire capture_enable = pipeline_ready;
     wire process_enable;
     wire display_enable;
     wire algo_frame_start;
@@ -143,22 +151,47 @@ module pgl50h_board_top #(
     wire output_frame_complete;
     wire input_frame_complete;
 
-    board_video_control control (
+    wire process_input_bank;
+    wire process_output_bank;
+    wire output_ready_toggle;
+    wire output_ready_bank;
+    wire input_overrun;
+    wire display_bank_core;
+    wire process_active;
+
+    realtime_frame_scheduler realtime_scheduler (
         .clk(core_clk),
         .rst_n(core_rst_n),
-        .ddr_init_done(ddr_init_done),
-        .hdmi_init_done(hdmi_init_done),
-        .input_frame_complete(input_frame_complete),
+        .input_frame_done(input_frame_complete),
+        .input_frame_bank(~input_frame_count[0]),
         .algo_frame_done(algo_frame_done),
-        .output_frame_complete(output_frame_complete),
-        .capture_enable(capture_enable),
-        .process_enable(process_enable),
-        .display_enable(display_enable),
-        .algo_frame_start(algo_frame_start)
+        .output_frame_done(output_frame_complete),
+        .display_bank_core(display_bank_core),
+        .process_start(algo_frame_start),
+        .process_input_bank(process_input_bank),
+        .process_output_bank(process_output_bank),
+        .process_active(process_active),
+        .output_ready_toggle(output_ready_toggle),
+        .output_ready_bank(output_ready_bank),
+        .input_overrun(input_overrun)
     );
+    assign process_enable = process_active;
 
-    // Capture exactly one complete HDMI frame: the first VS arms capture and
-    // the next VS marks completion. A toggle safely carries the event to DDR.
+    reg display_started;
+    reg output_ready_seen;
+    always @(posedge core_clk or negedge core_rst_n) begin
+        if (!core_rst_n) begin
+            display_started <= 1'b0;
+            output_ready_seen <= 1'b0;
+        end else if (output_ready_seen != output_ready_toggle) begin
+            display_started <= 1'b1;
+            output_ready_seen <= output_ready_toggle;
+        end
+    end
+    assign display_enable = pipeline_ready && display_started;
+
+    // The first VS arms the stream; every following VS completes one input
+    // frame.  A toggle safely carries each completion into the DDR domain.
     reg capture_pix_1;
     reg capture_pix_2;
     reg vs_in_d;
@@ -212,6 +245,13 @@ module pgl50h_board_top #(
     wire shared_wr_done;
     wire shared_wr_bac;
     wire shared_wr_data_re;
+    wire input_wr_done;
+    wire input_wr_bac;
+    wire input_wr_data_re;
+    wire algo_wr_done;
+    wire algo_wr_bac;
+    wire algo_wr_data_re;
+    wire algo_wr_cmd_ready;
 
     wr_buf #(
         .ADDR_WIDTH(CTRL_ADDR_WIDTH),
@@ -230,26 +270,20 @@ module pgl50h_board_top #(
         .wr_fsync(vs_in),
         .wr_en(de_in && capture_pix_2),
         .wr_data({r_in,g_in,b_in,8'h00}),
-        .rd_bac(capture_enable ? shared_wr_bac : 1'b0),
+        .rd_bac(capture_enable ? input_wr_bac : 1'b0),
         .ddr_wreq(input_wr_req),
         .ddr_waddr(input_wr_addr),
         .ddr_wr_len(input_wr_len),
-        .ddr_wrdy(capture_enable ? shared_wr_ready : 1'b0),
-        .ddr_wdone(capture_enable ? shared_wr_done : 1'b0),
+        .ddr_wrdy(capture_enable ? 1'b1 : 1'b0),
+        .ddr_wdone(capture_enable ? input_wr_done : 1'b0),
         .ddr_wdata(input_wr_data),
-        .ddr_wdata_req(capture_enable ? shared_wr_data_re : 1'b0),
+        .ddr_wdata_req(capture_enable ? input_wr_data_re : 1'b0),
         .frame_wcnt(input_frame_count),
         .frame_wirq(unused_input_frame_irq)
     );
 
-    reg [CTRL_ADDR_WIDTH-1:0] input_frame_base;
-    always @(posedge core_clk or negedge core_rst_n) begin
-        if (!core_rst_n)
-            input_frame_base <= {CTRL_ADDR_WIDTH{1'b0}};
-        else if (input_frame_complete)
-            input_frame_base <= {{(CTRL_ADDR_WIDTH-23){1'b0}},
-                                 ~input_frame_count[0], 22'b0};
-    end
+    wire [CTRL_ADDR_WIDTH-1:0] input_frame_base = process_input_bank ?
+        INPUT_FRAME_BASE1 : INPUT_FRAME_BASE0;
 
     // The legacy RGB888 one-pixel interface remains on mes50hp_top for
     // compatibility, but the 720P30 board path selects only the RGBX cache
@@ -322,6 +356,8 @@ module pgl50h_board_top #(
     wire [CTRL_ADDR_WIDTH-1:0] cache_ctrl_cmd_addr;
     wire [31:0] cache_ctrl_cmd_len;
     wire cache_ctrl_data_ready;
+    wire cache_ctrl_cmd_ready;
+    wire cache_ctrl_data_valid;
 
     ddr3_rgbx_cache_adapter #(
         .CACHE_ADDR_WIDTH(32), .CTRL_ADDR_WIDTH(CTRL_ADDR_WIDTH)
@@ -331,9 +367,9 @@ module pgl50h_board_top #(
         .cache_cmd_en(cache_rd_cmd_en), .cache_cmd_ready(cache_rd_cmd_ready),
         .cache_cmd_byte_addr(cache_rd_cmd_addr), .cache_cmd_len(cache_rd_cmd_len),
         .ctrl_cmd_en(cache_ctrl_cmd_en),
-        .ctrl_cmd_ready(process_enable ? shared_rd_ready : 1'b0),
+        .ctrl_cmd_ready(process_enable ? cache_ctrl_cmd_ready : 1'b0),
         .ctrl_cmd_word_addr(cache_ctrl_cmd_addr), .ctrl_cmd_len(cache_ctrl_cmd_len),
-        .ctrl_data_valid(process_enable && shared_rd_data_valid),
+        .ctrl_data_valid(process_enable && cache_ctrl_data_valid),
         .ctrl_data_ready(cache_ctrl_data_ready), .ctrl_data(shared_rd_data),
         .cache_data_valid(cache_rd_data_valid), .cache_data_ready(cache_rd_data_ready),
         .cache_data(cache_rd_data), .cache_data_last(cache_rd_data_last)
@@ -350,27 +386,29 @@ module pgl50h_board_top #(
     // replaced by a vendor dual-clock DRM implementation.
     algorithm_frame_writer #(
         .IMAGE_WIDTH(IMAGE_WIDTH), .IMAGE_HEIGHT(IMAGE_HEIGHT),
-        .DDR_ADDR_WIDTH(CTRL_ADDR_WIDTH), .OUTPUT_BASE_ADDR(OUTPUT_FRAME_BASE),
+        .DDR_ADDR_WIDTH(CTRL_ADDR_WIDTH), .OUTPUT_BASE_ADDR(OUTPUT_FRAME_BASE0),
         .SIMULATION(SIMULATION)
     ) corrected_frame_writer (
         .clk(core_clk), .rst_n(core_rst_n),
         .pixel_valid(algo_out_valid), .pixel_data(algo_out_pixel),
         .pixel_sof(algo_out_sof), .pixel_eol(algo_out_eol),
+        .frame_base_addr(process_output_bank ? OUTPUT_FRAME_BASE1 : OUTPUT_FRAME_BASE0),
         .overflow(output_writer_overflow),
         .frame_complete(output_frame_complete),
         .wr_cmd_en(algo_wr_cmd_en), .wr_cmd_addr(algo_wr_cmd_addr),
         .wr_cmd_len(algo_wr_cmd_len),
-        .wr_cmd_ready(process_enable ? shared_wr_ready : 1'b0),
-        .wr_cmd_done(process_enable ? shared_wr_done : 1'b0),
-        .wr_bac(process_enable ? shared_wr_bac : 1'b0),
+        .wr_cmd_ready(process_enable ? algo_wr_cmd_ready : 1'b0),
+        .wr_cmd_done(process_enable ? algo_wr_done : 1'b0),
+        .wr_bac(process_enable ? algo_wr_bac : 1'b0),
         .wr_ctrl_data(algo_wr_data),
-        .wr_data_re(process_enable ? shared_wr_data_re : 1'b0)
+        .wr_data_re(process_enable ? algo_wr_data_re : 1'b0)
     );
 
     wire timing_vs;
     wire timing_hs;
     wire timing_de;
     wire timing_de_request;
+    wire timing_frame_start;
     wire display_pixel_valid;
     wire [23:0] display_pixel;
     wire display_underflow;
@@ -390,30 +428,76 @@ module pgl50h_board_top #(
         .clk(video_pixel_clk), .rst_n(display_pix_2),
         .vs(timing_vs), .hs(timing_hs), .de(timing_de),
         .de_request(timing_de_request),
-        .x(), .y(), .frame_start()
+        .x(), .y(), .frame_start(timing_frame_start)
     );
+
+    // A completed output frame crosses by toggle; its bank becomes visible to
+    // HDMI only on the next timing frame boundary, never in active video.
+    reg output_ready_pix_1;
+    reg output_ready_pix_2;
+    reg output_ready_pix_3;
+    reg output_ready_bank_pix_1;
+    reg output_ready_bank_pix_2;
+    reg display_bank_pix;
+    always @(posedge video_pixel_clk or negedge video_rst_n) begin
+        if (!video_rst_n) begin
+            output_ready_pix_1 <= 1'b0;
+            output_ready_pix_2 <= 1'b0;
+            output_ready_pix_3 <= 1'b0;
+            output_ready_bank_pix_1 <= 1'b0;
+            output_ready_bank_pix_2 <= 1'b0;
+            display_bank_pix <= 1'b0;
+        end else begin
+            output_ready_pix_1 <= output_ready_toggle;
+            output_ready_pix_2 <= output_ready_pix_1;
+            output_ready_bank_pix_1 <= output_ready_bank;
+            output_ready_bank_pix_2 <= output_ready_bank_pix_1;
+            if (timing_frame_start && (output_ready_pix_2 != output_ready_pix_3)) begin
+                display_bank_pix <= output_ready_bank_pix_2;
+                output_ready_pix_3 <= output_ready_pix_2;
+            end
+        end
+    end
+
+    reg display_bank_core_1;
+    reg display_bank_core_2;
+    always @(posedge core_clk or negedge core_rst_n) begin
+        if (!core_rst_n) begin
+            display_bank_core_1 <= 1'b0;
+            display_bank_core_2 <= 1'b0;
+        end else begin
+            display_bank_core_1 <= display_bank_pix;
+            display_bank_core_2 <= display_bank_core_1;
+        end
+    end
+    assign display_bank_core = display_bank_core_2;
 
     wire frame_rd_cmd_en;
     wire [CTRL_ADDR_WIDTH-1:0] frame_rd_cmd_addr;
     wire [31:0] frame_rd_cmd_len;
     wire frame_rd_data_ready;
+    wire frame_rd_cmd_ready;
+    wire frame_rd_cmd_done;
+    wire frame_rd_data_valid;
 
     ddr3_frame_reader #(
         .IMAGE_WIDTH(IMAGE_WIDTH), .IMAGE_HEIGHT(IMAGE_HEIGHT),
-        .DDR_ADDR_WIDTH(CTRL_ADDR_WIDTH), .FRAME_BASE_ADDR(OUTPUT_FRAME_BASE),
+        .DDR_ADDR_WIDTH(CTRL_ADDR_WIDTH), .FRAME_BASE_ADDR(OUTPUT_FRAME_BASE0),
         .SIMULATION(SIMULATION)
     ) corrected_frame_reader (
         .ddr_clk(core_clk), .ddr_rst_n(core_rst_n),
         .pixel_clk(video_pixel_clk), .pixel_rst_n(video_rst_n),
         .display_enable(display_enable), .rd_fsync(timing_vs),
-        .rd_en(timing_de_request), .vout_de(display_pixel_valid),
+        .rd_en(timing_de_request),
+        .frame_base_addr(display_bank_core ? OUTPUT_FRAME_BASE1 : OUTPUT_FRAME_BASE0),
+        .vout_de(display_pixel_valid),
         .vout_data(display_pixel), .underflow(display_underflow),
         .rd_cmd_en(frame_rd_cmd_en), .rd_cmd_addr(frame_rd_cmd_addr),
         .rd_cmd_len(frame_rd_cmd_len),
-        .rd_cmd_ready(display_enable ? shared_rd_ready : 1'b0),
-        .rd_cmd_done(display_enable ? shared_rd_done : 1'b0),
+        .rd_cmd_ready(display_enable ? frame_rd_cmd_ready : 1'b0),
+        .rd_cmd_done(display_enable ? frame_rd_cmd_done : 1'b0),
         .rd_data(shared_rd_data),
-        .rd_data_valid(display_enable && shared_rd_data_valid),
+        .rd_data_valid(display_enable && frame_rd_data_valid),
         .rd_data_ready(frame_rd_data_ready)
     );
 
@@ -431,18 +515,53 @@ module pgl50h_board_top #(
         end
     end
 
-    wire shared_wr_cmd_en = capture_enable ? input_wr_req :
-                            process_enable ? algo_wr_cmd_en : 1'b0;
-    wire [CTRL_ADDR_WIDTH-1:0] shared_wr_cmd_addr = capture_enable ? input_wr_addr : algo_wr_cmd_addr;
-    wire [31:0] shared_wr_cmd_len = capture_enable ? input_wr_len : algo_wr_cmd_len;
-    wire [255:0] shared_wr_ctrl_data = capture_enable ? input_wr_data : algo_wr_data;
+    wire shared_wr_cmd_en;
+    wire [CTRL_ADDR_WIDTH-1:0] shared_wr_cmd_addr;
+    wire [31:0] shared_wr_cmd_len;
+    wire [255:0] shared_wr_ctrl_data;
 
-    wire shared_rd_cmd_en = process_enable ? cache_ctrl_cmd_en :
-                            display_enable ? frame_rd_cmd_en : 1'b0;
-    wire [CTRL_ADDR_WIDTH-1:0] shared_rd_cmd_addr = process_enable ? cache_ctrl_cmd_addr : frame_rd_cmd_addr;
-    wire [31:0] shared_rd_cmd_len = process_enable ? cache_ctrl_cmd_len : frame_rd_cmd_len;
-    wire shared_read_ready = process_enable ? cache_ctrl_data_ready :
-                               display_enable ? frame_rd_data_ready : 1'b1;
+    // Capture and corrected-output writes may overlap.  The arbiter latches
+    // the granted source until the controller completes that burst.
+    ddr_two_client_arbiter #(.ADDR_WIDTH(CTRL_ADDR_WIDTH)) write_arbiter (
+        .clk(core_clk), .rst_n(core_rst_n),
+        .c0_cmd_valid(capture_enable && input_wr_req),
+        .c0_cmd_addr(input_wr_addr), .c0_cmd_len(input_wr_len), .c0_data(input_wr_data),
+        .c0_cmd_ready(), .c0_done(input_wr_done),
+        .c0_bac(input_wr_bac), .c0_data_re(input_wr_data_re),
+        .c1_cmd_valid(process_enable && algo_wr_cmd_en),
+        .c1_cmd_addr(algo_wr_cmd_addr), .c1_cmd_len(algo_wr_cmd_len), .c1_data(algo_wr_data),
+        .c1_cmd_ready(algo_wr_cmd_ready), .c1_done(algo_wr_done),
+        .c1_bac(algo_wr_bac), .c1_data_re(algo_wr_data_re),
+        .ctrl_cmd_valid(shared_wr_cmd_en), .ctrl_cmd_addr(shared_wr_cmd_addr),
+        .ctrl_cmd_len(shared_wr_cmd_len), .ctrl_cmd_ready(shared_wr_ready),
+        .ctrl_done(shared_wr_done), .ctrl_bac(shared_wr_bac),
+        .ctrl_data_re(shared_wr_data_re), .ctrl_data(shared_wr_ctrl_data)
+    );
+
+    wire shared_rd_cmd_en;
+    wire [CTRL_ADDR_WIDTH-1:0] shared_rd_cmd_addr;
+    wire [31:0] shared_rd_cmd_len;
+    wire shared_read_ready;
+
+    // Cache reads and display prefetches likewise retain ownership from
+    // command acceptance through the final returned beat.  Display wins an
+    // idle-cycle tie to protect HDMI from starvation.
+    ddr_two_client_read_arbiter #(.ADDR_WIDTH(CTRL_ADDR_WIDTH)) read_arbiter (
+        .clk(core_clk), .rst_n(core_rst_n),
+        .c0_cmd_valid(process_enable && cache_ctrl_cmd_en),
+        .c0_cmd_addr(cache_ctrl_cmd_addr), .c0_cmd_len(cache_ctrl_cmd_len),
+        .c0_cmd_ready(cache_ctrl_cmd_ready), .c0_data_ready(cache_ctrl_data_ready),
+        .c0_data_valid(cache_ctrl_data_valid), .c0_data(shared_rd_data),
+        .c0_done(),
+        .c1_cmd_valid(display_enable && frame_rd_cmd_en),
+        .c1_cmd_addr(frame_rd_cmd_addr), .c1_cmd_len(frame_rd_cmd_len),
+        .c1_cmd_ready(frame_rd_cmd_ready), .c1_data_ready(frame_rd_data_ready),
+        .c1_data_valid(frame_rd_data_valid), .c1_data(), .c1_done(frame_rd_cmd_done),
+        .ctrl_cmd_valid(shared_rd_cmd_en), .ctrl_cmd_addr(shared_rd_cmd_addr),
+        .ctrl_cmd_len(shared_rd_cmd_len), .ctrl_cmd_ready(shared_rd_ready),
+        .ctrl_data_ready(shared_read_ready), .ctrl_data_valid(shared_rd_data_valid),
+        .ctrl_data(shared_rd_data), .ctrl_done(shared_rd_done)
+    );
 
     wire [CTRL_ADDR_WIDTH-1:0] axi_awaddr;
     wire [3:0] axi_awid;

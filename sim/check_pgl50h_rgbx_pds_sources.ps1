@@ -16,6 +16,8 @@ $required = @(
     '../../../../rtl/algorithm/distortion/distortion_image_pipeline.sv',
     '../../../../rtl/vendor/pgl50h/memory/pgl50h_tile_cache_bank_ip.v',
     '../../../../rtl/board/pgl50h/ddr3_rgbx_cache_adapter.sv',
+    '../../../../rtl/board/pgl50h/realtime_frame_scheduler.sv',
+    '../../../../rtl/board/pgl50h/ddr_two_client_arbiter.sv',
     '../../../../rtl/board/pgl50h/video_mode_720p30.sv'
 )
 

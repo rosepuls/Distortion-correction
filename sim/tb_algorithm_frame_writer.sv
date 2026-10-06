@@ -11,6 +11,7 @@ module tb_algorithm_frame_writer;
     reg [23:0] pixel_data = 24'd0;
     reg pixel_sof = 1'b0;
     reg pixel_eol = 1'b0;
+    reg [27:0] frame_base_addr = OUTPUT_BASE_ADDR;
     wire overflow;
     wire frame_complete;
 
@@ -48,6 +49,7 @@ module tb_algorithm_frame_writer;
         .pixel_data(pixel_data),
         .pixel_sof(pixel_sof),
         .pixel_eol(pixel_eol),
+        .frame_base_addr(frame_base_addr),
         .overflow(overflow),
         .frame_complete(frame_complete),
         .wr_cmd_en(wr_cmd_en),
@@ -128,6 +130,9 @@ module tb_algorithm_frame_writer;
         repeat (2) @(posedge clk);
 
         send_line(0);
+        // The next-frame base may change while a frame is in flight, but all
+        // line commands of this frame must retain the base sampled at SOF.
+        frame_base_addr = OUTPUT_BASE_ADDR + 28'h0010000;
         send_line(1);
 
         for (timeout = 0; timeout < 500 && !frame_complete; timeout = timeout + 1)

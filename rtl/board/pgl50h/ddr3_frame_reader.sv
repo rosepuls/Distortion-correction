@@ -1,8 +1,8 @@
 `timescale 1ns/1ps
 
-// Fixed-base corrected-frame reader. It prefetches one packed RGB888 line at
-// frame start and one following line at each active-line edge. The synthesis
-// branch uses the official 256-bit-to-32-bit dual-clock RAM.
+// Corrected-frame reader. It snapshots the selected frame base at frame start,
+// then prefetches one packed RGB888 line at each active-line edge. The
+// synthesis branch uses the official 256-bit-to-32-bit dual-clock RAM.
 module ddr3_frame_reader #(
     parameter integer IMAGE_WIDTH = 1280,
     parameter integer IMAGE_HEIGHT = 720,
@@ -17,6 +17,9 @@ module ddr3_frame_reader #(
     input  wire                      display_enable,
     input  wire                      rd_fsync,
     input  wire                      rd_en,
+    // May change only between frames from the caller's perspective; this
+    // block still snapshots it internally for coherent per-frame reads.
+    input  wire [DDR_ADDR_WIDTH-1:0] frame_base_addr,
     output wire                      vout_de,
     output reg  [23:0]               vout_data,
     output reg                       underflow,
@@ -51,6 +54,7 @@ module ddr3_frame_reader #(
     reg [LINE_INDEX_WIDTH-1:0] next_line_index;
     reg [8:0] write_beat_addr;
     reg prefetch_seen_ddr;
+    reg [DDR_ADDR_WIDTH-1:0] active_frame_base;
 
     assign frame_start_ddr = fsync_ddr_2 && !fsync_ddr_3;
     assign line_start_ddr = active_ddr_2 && !active_ddr_3;
@@ -84,6 +88,7 @@ module ddr3_frame_reader #(
             rd_cmd_addr <= FRAME_BASE_ADDR;
             write_beat_addr <= 9'd0;
             prefetch_seen_ddr <= 1'b0;
+            active_frame_base <= FRAME_BASE_ADDR;
         end else begin
             rd_cmd_en <= 1'b0;
 
@@ -95,6 +100,7 @@ module ddr3_frame_reader #(
                 prefetch_seen_ddr <= 1'b0;
             end else begin
                 if (frame_start_ddr) begin
+                    active_frame_base <= frame_base_addr;
                     cmd_pending <= 1'b1;
                     next_line_index <= {LINE_INDEX_WIDTH{1'b0}};
                     write_beat_addr <= 9'd0;
@@ -103,12 +109,14 @@ module ddr3_frame_reader #(
                     cmd_pending <= 1'b1;
                 end
 
-                if ((cmd_state == CMD_IDLE) && cmd_pending && rd_cmd_ready) begin
-                    rd_cmd_addr <= FRAME_BASE_ADDR + next_line_index * WORDS_PER_LINE;
+                if ((cmd_state == CMD_IDLE) && cmd_pending) begin
+                    rd_cmd_addr <= active_frame_base + next_line_index * WORDS_PER_LINE;
                     rd_cmd_en <= 1'b1;
-                    cmd_pending <= 1'b0;
-                    next_line_index <= next_line_index + 1'b1;
-                    cmd_state <= CMD_BUSY;
+                    if (rd_cmd_ready) begin
+                        cmd_pending <= 1'b0;
+                        next_line_index <= next_line_index + 1'b1;
+                        cmd_state <= CMD_BUSY;
+                    end
                 end else if ((cmd_state == CMD_BUSY) && rd_cmd_done) begin
                     cmd_state <= CMD_IDLE;
                 end

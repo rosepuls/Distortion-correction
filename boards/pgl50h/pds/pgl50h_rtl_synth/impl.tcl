@@ -47,6 +47,8 @@ compile -top_module mes50hp_top
 synthesize -ads -selected_syn_tool_opt 2 
 dev_map 
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/board_video_control.sv"
+add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/realtime_frame_scheduler.sv"
+add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/ddr_two_client_arbiter.sv"
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/ddr3_rgbx_cache_adapter.sv"
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/algorithm_frame_writer.sv"
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/ddr3_frame_reader.sv"
@@ -145,6 +147,8 @@ remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/
 remove_constraint  -logic -fdc "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/boards/pgl50h/constraints/pgl50h_board_top.fdc"
 remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/algorithm_frame_writer.sv"
 remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/board_video_control.sv"
+remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/realtime_frame_scheduler.sv"
+remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/ddr_two_client_arbiter.sv"
 remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/ddr3_frame_reader.sv"
 remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/ddr3_rgbx_cache_adapter.sv"
 remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/mes50hp_top.sv"
@@ -178,6 +182,8 @@ remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/algorithm_frame_writer.sv"
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/algorithm_frame_writer_rgbx.sv"
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/board_video_control.sv"
+add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/realtime_frame_scheduler.sv"
+add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/ddr_two_client_arbiter.sv"
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/clock_reset.sv"
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/ddr3_frame_reader.sv"
 add_design "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/board/pgl50h/ddr3_frame_reader_rgbx.sv"
@@ -376,6 +382,14 @@ synthesize -ads -selected_syn_tool_opt 2
 dev_map 
 pnr 
 report_timing 
+set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
+compile -top_module pgl50h_board_top
+synthesize -ads -selected_syn_tool_opt 2 
+dev_map 
+pnr 
+report_timing 
+set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
+compile -top_module pgl50h_board_top
 set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
 compile -top_module pgl50h_board_top
 synthesize -ads -selected_syn_tool_opt 2 
