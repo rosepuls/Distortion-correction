@@ -424,7 +424,7 @@ module pgl50h_board_top #(
         end
     end
 
-    video_mode_720p30 output_timing (
+    video_mode_720p60 output_timing (
         .clk(video_pixel_clk), .rst_n(display_pix_2),
         .vs(timing_vs), .hs(timing_hs), .de(timing_de),
         .de_request(timing_de_request),

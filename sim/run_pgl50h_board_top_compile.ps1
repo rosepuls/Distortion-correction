@@ -36,7 +36,7 @@ try {
         (Join-Path $projectRoot 'rtl\board\pgl50h\board_video_control.sv') `
         (Join-Path $projectRoot 'rtl\board\pgl50h\realtime_frame_scheduler.sv') `
         (Join-Path $projectRoot 'rtl\board\pgl50h\ddr_two_client_arbiter.sv') `
-        (Join-Path $projectRoot 'rtl\board\pgl50h\video_mode_720p30.sv') `
+        (Join-Path $projectRoot 'rtl\board\pgl50h\video_mode_720p60.sv') `
         (Join-Path $projectRoot 'rtl\board\pgl50h\pgl50h_board_top.sv') `
         (Join-Path $projectRoot 'sim\tb_pgl50h_board_top_compile.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

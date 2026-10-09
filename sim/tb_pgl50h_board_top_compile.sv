@@ -25,6 +25,8 @@ module tb_pgl50h_board_top_compile;
     integer video_reset_hold_edges = 0;
     integer ddr_reset_hold_edges = 0;
     integer process_start_count = 0;
+    reg expected_display_bank;
+    reg expected_ready_toggle;
 
     always #10 sys_clk = ~sys_clk;
     always #7 pixclk_in = ~pixclk_in;
@@ -151,6 +153,31 @@ module tb_pgl50h_board_top_compile;
         release dut.cache_rd_cmd_addr;
         release dut.cache_rd_cmd_len;
         release dut.input_frame_base;
+
+        // The display reader latches its DDR base address at VS rising.  A
+        // completed frame must therefore be adopted at raster origin, not at
+        // the first active pixel.  Queue bank 1, allow the toggle CDC to
+        // settle, then present the timing generator with h=0/v=0.
+        expected_display_bank = ~dut.display_bank_pix;
+        expected_ready_toggle = ~dut.output_ready_toggle;
+        force dut.output_ready_toggle = expected_ready_toggle;
+        force dut.output_ready_bank = expected_display_bank;
+        repeat (3) @(posedge dut.video_pixel_clk);
+        if (dut.display_bank_pix !== ~expected_display_bank)
+            $fatal(1, "TEST_FAIL: display bank changed before a frame origin");
+        force dut.output_timing.h_count = '0;
+        force dut.output_timing.v_count = '0;
+        #1;
+        if (!(dut.timing_frame_start && dut.timing_vs && dut.timing_hs && !dut.timing_de))
+            $fatal(1, "TEST_FAIL: timing frame start is not the VS/HS raster origin");
+        @(posedge dut.video_pixel_clk);
+        #1;
+        if (dut.display_bank_pix !== expected_display_bank)
+            $fatal(1, "TEST_FAIL: queued output bank was not adopted at frame origin");
+        release dut.output_timing.h_count;
+        release dut.output_timing.v_count;
+        release dut.output_ready_toggle;
+        release dut.output_ready_bank;
         $display("TEST_PASS: pgl50h_board_top_compile");
         $finish;
     end
