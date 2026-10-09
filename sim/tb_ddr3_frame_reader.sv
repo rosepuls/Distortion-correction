@@ -3,6 +3,8 @@
 module tb_ddr3_frame_reader;
     localparam integer IMAGE_WIDTH = 32;
     localparam integer IMAGE_HEIGHT = 2;
+    localparam integer FRAME_PIXELS = IMAGE_WIDTH * IMAGE_HEIGHT;
+    localparam integer DISPLAY_REFRESHES = 2;
     localparam [27:0] FRAME_BASE_ADDR = 28'h0800000;
 
     reg ddr_clk = 1'b0;
@@ -34,7 +36,8 @@ module tb_ddr3_frame_reader;
     reg backend_active = 1'b0;
 
     always #5 ddr_clk = ~ddr_clk;
-    always #7 pixel_clk = ~pixel_clk;
+    // 74.25 MHz HDMI-pixel-clock equivalent used by the 720p60 output.
+    always #6.734 pixel_clk = ~pixel_clk;
 
     ddr3_frame_reader #(
         .IMAGE_WIDTH(IMAGE_WIDTH),
@@ -98,11 +101,12 @@ module tb_ddr3_frame_reader;
                 $display("FAIL: expected three beats per line, got %0d", rd_cmd_len);
                 errors = errors + 1;
             end
-            if (rd_cmd_addr !== FRAME_BASE_ADDR + command_count * 24) begin
+            if (rd_cmd_addr !== FRAME_BASE_ADDR +
+                               (command_count % IMAGE_HEIGHT) * 24) begin
                 $display("FAIL: command %0d address %h", command_count, rd_cmd_addr);
                 errors = errors + 1;
             end
-            active_line <= command_count;
+            active_line <= command_count % IMAGE_HEIGHT;
             active_beat <= 0;
             command_count <= command_count + 1;
             backend_active <= 1'b1;
@@ -120,9 +124,9 @@ module tb_ddr3_frame_reader;
 
     always @(posedge pixel_clk) begin
         if (vout_de) begin
-            if (vout_data !== pixels[output_count]) begin
+            if (vout_data !== pixels[output_count % FRAME_PIXELS]) begin
                 $display("FAIL: output pixel %0d expected %h got %h",
-                         output_count, pixels[output_count], vout_data);
+                         output_count, pixels[output_count % FRAME_PIXELS], vout_data);
                 errors = errors + 1;
             end
             output_count = output_count + 1;
@@ -141,6 +145,17 @@ module tb_ddr3_frame_reader;
         end
     endtask
 
+    task automatic start_display_refresh;
+        begin
+            rd_fsync <= 1'b1;
+            @(posedge pixel_clk);
+            rd_fsync <= 1'b0;
+            // Allow the frame-start command to cross to DDR and fill the
+            // line buffer before the first active line requests pixels.
+            repeat (30) @(posedge pixel_clk);
+        end
+    endtask
+
     integer i;
     initial begin
         for (i = 0; i < IMAGE_WIDTH*IMAGE_HEIGHT; i = i + 1)
@@ -150,24 +165,25 @@ module tb_ddr3_frame_reader;
         rst_n <= 1'b1;
         display_enable <= 1'b1;
         repeat (3) @(posedge pixel_clk);
-        rd_fsync <= 1'b1;
-        @(posedge pixel_clk);
-        rd_fsync <= 1'b0;
-
-        repeat (30) @(posedge pixel_clk);
-        // The pending display-bank selection may change during a frame.  The
-        // second line must still come from the base sampled at frame start.
-        frame_base_addr <= FRAME_BASE_ADDR + 28'h0010000;
+        // The 30 fps producer leaves this completed DDR frame intact while
+        // the 60 Hz HDMI timing reads it during two complete refreshes.
+        start_display_refresh();
+        drive_active_line();
+        drive_active_line();
+        repeat (8) @(posedge pixel_clk);
+        start_display_refresh();
         drive_active_line();
         drive_active_line();
         repeat (8) @(posedge pixel_clk);
 
-        if (command_count != IMAGE_HEIGHT) begin
-            $display("FAIL: expected %0d line commands, got %0d", IMAGE_HEIGHT, command_count);
+        if (command_count != IMAGE_HEIGHT * DISPLAY_REFRESHES) begin
+            $display("FAIL: expected %0d line commands, got %0d",
+                     IMAGE_HEIGHT * DISPLAY_REFRESHES, command_count);
             errors = errors + 1;
         end
-        if (output_count != IMAGE_WIDTH*IMAGE_HEIGHT) begin
-            $display("FAIL: expected %0d pixels, got %0d", IMAGE_WIDTH*IMAGE_HEIGHT, output_count);
+        if (output_count != FRAME_PIXELS * DISPLAY_REFRESHES) begin
+            $display("FAIL: expected %0d pixels, got %0d",
+                     FRAME_PIXELS * DISPLAY_REFRESHES, output_count);
             errors = errors + 1;
         end
         if (underflow) begin

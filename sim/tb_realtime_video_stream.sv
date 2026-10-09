@@ -5,6 +5,7 @@
 // that tag through capture, correction/write and display-bank selection.
 module tb_realtime_video_stream;
     localparam integer CORE_FRAME_CYCLES = 3_333_333; // 100 MHz / 30 fps
+    localparam integer HALF_DISPLAY_PERIOD = CORE_FRAME_CYCLES / 2;
     localparam integer FRAME_COUNT = 5;
 
     reg clk = 1'b0;
@@ -127,20 +128,40 @@ module tb_realtime_video_stream;
         submit_input_frame(0);
         next_input_cycle = cycle_count + CORE_FRAME_CYCLES;
         for (i = 1; i < FRAME_COUNT; i = i + 1) begin
-            // Inject a different short DDR stall in each frame's processing
-            // interval.  It must delay completion, never reorder/drop a tag.
-            // The scheduler has issued the modelled DDR read by this point;
-            // stall its active transaction rather than the later arithmetic.
-            repeat (2) @(posedge clk);
-            ddr_stall = 1'b1;
-            repeat (3 + i) @(posedge clk);
-            ddr_stall = 1'b0;
+            // A display boundary occurs every 1/60 second, twice per source
+            // frame.  In the nominal path a completed 30 fps result must be
+            // selected at both boundaries: A,A then B,B, and so on.
+            //
+            // Deliberately keep frame 1's DDR request stalled through its
+            // first eligible boundary.  The legal boundary sequence is then
+            // A,A,A,B: repeat the last complete output, never expose a
+            // partial/invalid output while the producer is late.
+            if (i == 2) begin
+                ddr_stall = 1'b1;
+                while (cycle_count < next_input_cycle - HALF_DISPLAY_PERIOD - 2)
+                    @(posedge clk);
+                pulse_display_boundary();
+                check_cond(display_tag_valid && display_tag == expected_tags[i-2],
+                           "late producer did not repeat the previous complete frame");
+                ddr_stall = 1'b0;
+            end else begin
+                // A short non-destructive DDR stall still exercises the
+                // regular overlap path for every other frame.
+                repeat (2) @(posedge clk);
+                ddr_stall = 1'b1;
+                repeat (3 + i) @(posedge clk);
+                ddr_stall = 1'b0;
+                while (cycle_count < next_input_cycle - HALF_DISPLAY_PERIOD - 2)
+                    @(posedge clk);
+                pulse_display_boundary();
+                check_cond(display_tag_valid && display_tag == expected_tags[i-1],
+                           "first 60 Hz boundary did not select the preceding complete frame");
+            end
+
             while (cycle_count < next_input_cycle - 2) @(posedge clk);
             pulse_display_boundary();
-            check_cond(display_tag_valid,
-                       "a completed output was not available at the next display boundary");
-            check_cond(display_tag == expected_tags[i-1],
-                       "displayed frame tag is not the preceding captured frame");
+            check_cond(display_tag_valid && display_tag == expected_tags[i-1],
+                       "second 60 Hz boundary did not preserve/select the expected frame");
             submit_input_frame(i);
             // Capturing the next frame, processing its predecessor and
             // displaying the prior output must overlap after frame one.
@@ -152,11 +173,15 @@ module tb_realtime_video_stream;
             next_input_cycle = next_input_cycle + CORE_FRAME_CYCLES;
         end
 
-        // Adopt the fifth result on one final output-frame boundary.
+        // The final 30 fps result also owns two 60 Hz refreshes.
+        while (cycle_count < next_input_cycle - HALF_DISPLAY_PERIOD - 2) @(posedge clk);
+        pulse_display_boundary();
+        check_cond(display_tag_valid && display_tag == expected_tags[FRAME_COUNT-1],
+                   "first final 60 Hz boundary did not select the fifth frame");
         while (cycle_count < next_input_cycle - 1) @(posedge clk);
         pulse_display_boundary();
         check_cond(display_tag_valid && display_tag == expected_tags[FRAME_COUNT-1],
-                   "final display tag did not match the fifth captured frame");
+                   "second final 60 Hz boundary did not preserve the fifth frame");
         check_cond(completed_frames == FRAME_COUNT,
                    "not every captured frame reached a completed output bank");
         check_cond(!input_overrun, "scheduler raised input_overrun at 30 fps");
