@@ -410,7 +410,7 @@
         </param>
         <param>
             <name>CLKOUT0_REQ_FREQ_basicPage</name>
-            <value>37.1250</value>
+            <value>74.2500</value>
             <decimal>4</decimal>
         </param>
         <param>
@@ -587,7 +587,7 @@
         </param>
         <param>
             <name>STATIC_RATIO0_basicPage</name>
-            <value>22</value>
+            <value>11</value>
         </param>
         <param>
             <name>CLKSWITCH_FLAG_ENABLE_basicPage</name>
@@ -652,10 +652,12 @@
     </synthesis>
     <file_list>
         <output>
-            <file pathname="generate.log" format="log" description="Generate Log"/>
+            <file pathname="generate_720p60.log" format="log" description="Generate Log"/>
             <file pathname="pll_tb.v" format="verilog" description="Compiled File"/>
             <file pathname="pll_tmpl.v" format="verilog" description="Instantiation Template"/>
             <file pathname="pll_tmpl.vhdl" format="vhdl" description="Instantiation Template"/>
+            <file pathname="rev_1/synthesize/pll_syn.vm" format="vm" description="Synthesis Result"/>
+            <file pathname="rev_1/run.log" format="log" description="Synthesis Log"/>
         </output>
         <source>
             <file pathname="pll.v"/>

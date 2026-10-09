@@ -109,7 +109,7 @@ Compile
 
 1. 顶层端口均有管脚，且没有旧的 `clk/frame_start/mem_req_*` 虚拟 IO；
 2. `DDR3_50H`、PLL、两个帧缓存 IP 没有被当成黑盒；
-3. 在综合前，使用 PDS 根据 `ip/pango/mes50hp_video_pll/pll.idf` 重新生成 `clkout0`，目标为 **37.125 MHz**，并保持 `clkout1` 为约 9.959 MHz。当前生成参数对应 `STATIC_RATIO0=22`、`STATIC_RATIOF=49`；`.fdc` 使用 `49/66` 与 `49/246`，以匹配 PDS 的实际整数分频结果。PDS 报告应显示约 37.121 MHz 与约 9.959 MHz；
+3. 在综合前，使用 PDS 根据 `ip/pango/mes50hp_video_pll/pll.idf` 重新生成 `clkout0`，目标为 **74.250 MHz**，并保持 `clkout1` 为约 9.959 MHz。当前生成参数对应 `STATIC_RATIO0=11`、`STATIC_RATIOF=49`；`.fdc` 使用 `49/33` 与 `49/246`，以匹配 PDS 的实际整数分频结果。PDS 报告应显示约 74.242 MHz（约 59.994 Hz 的 1650×750 输出）与约 9.959 MHz；
 4. 没有 unconstrained clocks；
 5. Setup/Hold 均无负裕量；
 6. DDR PHY 校准相关布局约束没有实例路径失配；
