@@ -18,7 +18,7 @@ $required = @(
     '../../../../rtl/board/pgl50h/ddr3_rgbx_cache_adapter.sv',
     '../../../../rtl/board/pgl50h/realtime_frame_scheduler.sv',
     '../../../../rtl/board/pgl50h/ddr_two_client_arbiter.sv',
-    '../../../../rtl/board/pgl50h/video_mode_720p30.sv'
+    '../../../../rtl/board/pgl50h/video_mode_720p60.sv'
 )
 
 foreach ($path in $required) {
@@ -29,7 +29,8 @@ foreach ($path in $required) {
 
 $implRequired = @(
     'rtl/platform/common/memory/tile_cache_bank_ram.sv',
-    'rtl/vendor/pgl50h/memory/pgl50h_tile_cache_bank_ip.v'
+    'rtl/vendor/pgl50h/memory/pgl50h_tile_cache_bank_ip.v',
+    'rtl/board/pgl50h/video_mode_720p60.sv'
 )
 foreach ($path in $implRequired) {
     if ($implText -notmatch [regex]::Escape($path)) {
@@ -39,7 +40,8 @@ foreach ($path in $implRequired) {
 
 $legacy = @(
     '../../../../rtl/board/pgl50h/ddr3_pixel_read_adapter.sv',
-    '../../../../rtl/vendor/pgl50h/video/sync_vg.v'
+    '../../../../rtl/vendor/pgl50h/video/sync_vg.v',
+    '../../../../rtl/board/pgl50h/video_mode_720p30.sv'
 )
 
 foreach ($path in $legacy) {
@@ -48,7 +50,7 @@ foreach ($path in $legacy) {
     }
 }
 
-if ($implText -match 'ddr3_pixel_read_adapter\.sv|rtl/vendor/pgl50h/video/sync_vg\.v') {
+if ($implText -match 'ddr3_pixel_read_adapter\.sv|rtl/vendor/pgl50h/video/sync_vg\.v|rtl/board/pgl50h/video_mode_720p30\.sv') {
     throw 'PDS impl.tcl still selects a retired source.'
 }
 

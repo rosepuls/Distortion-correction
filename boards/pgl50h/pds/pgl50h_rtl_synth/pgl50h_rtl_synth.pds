@@ -63,7 +63,7 @@
                     (_format verilog)
                     (_timespec "2026-10-05T11:11:16")
                 )
-                (_file "../../../../rtl/board/pgl50h/video_mode_720p30.sv"
+                (_file "../../../../rtl/board/pgl50h/video_mode_720p60.sv"
                     (_format verilog)
                     (_timespec "2026-10-03T17:11:50")
                 )
