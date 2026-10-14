@@ -4,10 +4,10 @@ set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
 compile -top_module pixel_fetch_engine
 set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
 compile -top_module pixel_fetch_engine
-synthesize -ads -selected_syn_tool_opt 2 
-dev_map 
-pnr 
-report_timing 
+synthesize -ads -selected_syn_tool_opt 2
+dev_map
+pnr
+report_timing
 remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/algorithm/preprocess/brightness_gain.sv"
 remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/algorithm/distortion/coordinate_gen.sv"
 remove_design -verilog "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/rtl/algorithm/distortion/distortion_core.sv"
@@ -85,10 +85,10 @@ dev_map
 pnr 
 set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
 compile -top_module pgl50h_board_top
-synthesize -ads -selected_syn_tool_opt 2 
-dev_map 
-pnr 
-report_timing 
+synthesize -ads -selected_syn_tool_opt 2
+dev_map
+pnr
+report_timing
 set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
 compile -top_module pgl50h_board_top
 synthesize -ads -selected_syn_tool_opt 2 
@@ -390,6 +390,12 @@ pnr
 report_timing 
 set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
 compile -top_module pgl50h_board_top
+set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
+compile -top_module pgl50h_board_top
+synthesize -ads -selected_syn_tool_opt 2 
+dev_map 
+pnr 
+report_timing 
 set_arch -family Logos -device PGL50H -speedgrade -6 -package FBG484
 compile -top_module pgl50h_board_top
 synthesize -ads -selected_syn_tool_opt 2 

@@ -27,6 +27,7 @@ module tb_realtime_video_stream;
     wire input_overrun;
     wire ddr_stall_seen;
     wire [31:0] completed_frames;
+    wire [31:0] display_refresh_count;
 
     integer cycle_count = 0;
     integer errors = 0;
@@ -63,7 +64,8 @@ module tb_realtime_video_stream;
         .process_output_bank(process_output_bank), .display_active(display_active),
         .display_bank(display_bank), .display_tag_valid(display_tag_valid),
         .display_tag(display_tag), .input_overrun(input_overrun),
-        .ddr_stall_seen(ddr_stall_seen), .completed_frames(completed_frames)
+        .ddr_stall_seen(ddr_stall_seen), .completed_frames(completed_frames),
+        .display_refresh_count(display_refresh_count)
     );
 
     task automatic check_cond(input condition, input [8*120-1:0] message);

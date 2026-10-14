@@ -362,7 +362,26 @@ module distortion_core_optimized #(
     reg signed [23:0] stage4_cx_q12;
     reg signed [23:0] stage4_cy_q12;
 
-    // Stage 5 isolates coefficient multipliers from tangential summation.
+    // Stage 5P isolates the two tangential-base coefficient multipliers from
+    // their Q18 quantization.  The boundary must remain physical: otherwise
+    // PDS can combine an APM product and its saturation muxes in one 100 MHz
+    // cycle.
+    reg stage5p_valid;
+    reg stage5p_sof;
+    reg stage5p_eol;
+    reg signed [40:0] stage5p_radial_x_product;
+    reg signed [40:0] stage5p_radial_y_product;
+    reg signed [39:0] stage5p_p1_xy_product;
+    reg signed [39:0] stage5p_p2_xy_product;
+    reg signed [41:0] stage5p_p2_base_product /* synthesis syn_preserve = 1 */;
+    reg signed [41:0] stage5p_p1_base_product /* synthesis syn_preserve = 1 */;
+    reg signed [23:0] stage5p_fx_q12;
+    reg signed [23:0] stage5p_fy_q12;
+    reg signed [23:0] stage5p_cx_q12;
+    reg signed [23:0] stage5p_cy_q12;
+
+    // Stage 5 quantizes the registered multiplier outputs before the
+    // tangential summation in Stage 6.
     reg stage5_valid;
     reg stage5_sof;
     reg stage5_eol;
@@ -484,17 +503,17 @@ module distortion_core_optimized #(
     wire signed [41:0] p1_base_product =
         stage4_p1_q18 * stage4_tangential_y_base;
     wire signed [20:0] radial_x_q18 =
-        saturate_s21($signed(stage4_radial_x_product) >>> 18);
+        saturate_s21($signed(stage5p_radial_x_product) >>> 18);
     wire signed [20:0] radial_y_q18 =
-        saturate_s21($signed(stage4_radial_y_product) >>> 18);
+        saturate_s21($signed(stage5p_radial_y_product) >>> 18);
     wire signed [20:0] tangential_x_term1 =
-        saturate_s21($signed(stage4_p1_xy_product) >>> 17);
+        saturate_s21($signed(stage5p_p1_xy_product) >>> 17);
     wire signed [20:0] tangential_x_term2 =
-        saturate_s21($signed(p2_base_product) >>> 18);
+        saturate_s21($signed(stage5p_p2_base_product) >>> 18);
     wire signed [20:0] tangential_y_term1 =
-        saturate_s21($signed(p1_base_product) >>> 18);
+        saturate_s21($signed(stage5p_p1_base_product) >>> 18);
     wire signed [20:0] tangential_y_term2 =
-        saturate_s21($signed(stage4_p2_xy_product) >>> 17);
+        saturate_s21($signed(stage5p_p2_xy_product) >>> 17);
     wire signed [63:0] tangential_x_sum =
         {{43{stage5_tangential_x_term1[20]}},
          stage5_tangential_x_term1} +
@@ -591,6 +610,9 @@ module distortion_core_optimized #(
             stage4_valid <= 1'b0;
             stage4_sof <= 1'b0;
             stage4_eol <= 1'b0;
+            stage5p_valid <= 1'b0;
+            stage5p_sof <= 1'b0;
+            stage5p_eol <= 1'b0;
             stage5_valid <= 1'b0;
             stage5_sof <= 1'b0;
             stage5_eol <= 1'b0;
@@ -721,21 +743,36 @@ module distortion_core_optimized #(
             stage6_cx_q12 <= stage5_cx_q12;
             stage6_cy_q12 <= stage5_cy_q12;
 
-            // Stage 5: second tangential multipliers and all original term
-            // quantization points.
-            stage5_valid <= stage4_valid;
-            stage5_sof <= stage4_sof;
-            stage5_eol <= stage4_eol;
+            // Stage 5: quantize the products captured by Stage 5P.
+            stage5_valid <= stage5p_valid;
+            stage5_sof <= stage5p_sof;
+            stage5_eol <= stage5p_eol;
             stage5_radial_x_q18 <= radial_x_q18;
             stage5_radial_y_q18 <= radial_y_q18;
             stage5_tangential_x_term1 <= tangential_x_term1;
             stage5_tangential_x_term2 <= tangential_x_term2;
             stage5_tangential_y_term1 <= tangential_y_term1;
             stage5_tangential_y_term2 <= tangential_y_term2;
-            stage5_fx_q12 <= stage4_fx_q12;
-            stage5_fy_q12 <= stage4_fy_q12;
-            stage5_cx_q12 <= stage4_cx_q12;
-            stage5_cy_q12 <= stage4_cy_q12;
+            stage5_fx_q12 <= stage5p_fx_q12;
+            stage5_fy_q12 <= stage5p_fy_q12;
+            stage5_cx_q12 <= stage5p_cx_q12;
+            stage5_cy_q12 <= stage5p_cy_q12;
+
+            // Stage 5P: capture the full-precision tangential-base products
+            // before saturation and carry every aligned payload field.
+            stage5p_valid <= stage4_valid;
+            stage5p_sof <= stage4_sof;
+            stage5p_eol <= stage4_eol;
+            stage5p_radial_x_product <= stage4_radial_x_product;
+            stage5p_radial_y_product <= stage4_radial_y_product;
+            stage5p_p1_xy_product <= stage4_p1_xy_product;
+            stage5p_p2_xy_product <= stage4_p2_xy_product;
+            stage5p_p2_base_product <= p2_base_product;
+            stage5p_p1_base_product <= p1_base_product;
+            stage5p_fx_q12 <= stage4_fx_q12;
+            stage5p_fy_q12 <= stage4_fy_q12;
+            stage5p_cx_q12 <= stage4_cx_q12;
+            stage5p_cy_q12 <= stage4_cy_q12;
 
             // Stage 4: first radial/tangential products and lossless bases.
             stage4_valid <= stage3_valid;

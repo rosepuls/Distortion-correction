@@ -65,7 +65,8 @@ module realtime_video_stream_harness #(
     output wire process_output_bank, output wire display_active,
     output reg display_bank, output reg display_tag_valid,
     output reg [23:0] display_tag, output wire input_overrun,
-    output wire ddr_stall_seen, output reg [31:0] completed_frames
+    output wire ddr_stall_seen, output reg [31:0] completed_frames,
+    output reg [31:0] display_refresh_count
 );
     reg [23:0] input_tags [0:1];
     reg [23:0] output_tags [0:1];
@@ -116,6 +117,7 @@ module realtime_video_stream_harness #(
             output_ready_seen <= 1'b0; display_pending <= 1'b0;
             display_pending_bank <= 1'b0; display_bank <= 1'b0;
             display_tag_valid <= 1'b0; display_tag <= 24'd0;
+            display_refresh_count <= 32'd0;
         end else begin
             algo_frame_done <= 1'b0;
             output_frame_done <= 1'b0;
@@ -157,6 +159,8 @@ module realtime_video_stream_harness #(
                 display_pending <= 1'b1;
                 display_pending_bank <= output_ready_bank;
             end
+            if (display_frame_start)
+                display_refresh_count <= display_refresh_count + 1'b1;
             if (display_frame_start && display_pending) begin
                 display_bank <= display_pending_bank;
                 display_tag <= output_tags[display_pending_bank];
