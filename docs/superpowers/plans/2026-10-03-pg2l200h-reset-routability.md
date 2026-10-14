@@ -1,8 +1,8 @@
-# PGL50H Reset Routability Implementation Plan
+# PG2L200H Reset Routability Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Preserve the 1280x720@30 RGBX-cache image pipeline while removing the large asynchronous-reset routing cone that prevents PGL50H detailed routing from converging.
+**Goal:** Preserve the 1280x720@60 RGBX-cache image pipeline while removing the large asynchronous-reset routing cone that prevents PG2L200H detailed routing from converging.
 
 **Architecture:** The current synthesis result has only 36.30% LUT, 15.06% register, 36.94% DRM18K, and 50.00% APM utilization, but `algorithm_system.core_rst_n` drives 4,383 asynchronous-reset pins.  Split this signal into reset leaves located at functional boundaries, and make FIFO/cache payload storage reset-safe by resetting validity, pointers, and state rather than every stored data bit.  The existing frame-start cache invalidation remains the mechanism that retires prior-frame cache contents.
 
@@ -10,8 +10,8 @@
 
 ## Global Constraints
 
-- Keep `pgl50h_board_top` at 1280x720@30 and retain the 37.125 MHz video pixel-clock definition.
-- Preserve `cached_pixel_fetch_engine` request/response throughput and the 720p30 target of one image frame within 2,500,000 core-clock cycles.
+- Keep `pg2l200h_board_top` at 1280x720@60 and retain the 74.25 MHz video pixel-clock definition.
+- Preserve `cached_pixel_fetch_engine` request/response throughput and the 720p60 target of one image frame within 2,500,000 core-clock cycles.
 - Do not change DDR3 IP-generated RTL, pin assignments, or DDR PHY placement constraints.
 - Do not use `set_false_path`, weaker clock constraints, or larger router iteration limits to hide the physical problem.
 - The agent does not run PDS synthesis or Place & Route; PDS-derived checks are run by the user after implementation.
@@ -22,8 +22,8 @@
 ### Task 1: Add a PDS-artifact fanout acceptance check
 
 **Files:**
-- Create: `sim/check_pgl50h_algorithm_reset_fanout.ps1`
-- Test input: `boards/pgl50h/pds/pgl50h_rtl_synth/synthesize/pgl50h_board_top_controlsets.txt`
+- Create: `sim/check_pg2l200h_algorithm_reset_fanout.ps1`
+- Test input: `boards/pg2l200h/pds/pg2l200h_rtl_synth/synthesize/pg2l200h_board_top_controlsets.txt`
 
 **Interfaces:**
 - Consumes: PDS-generated `Number of DFF:CP Signals` report section.
@@ -42,7 +42,7 @@ The production condition this catches is retaining a single reset driver for eve
 
 - [x] **Step 2: Run the check against the current report**
 
-Run: `powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\check_pgl50h_algorithm_reset_fanout.ps1`
+Run: `powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\check_pg2l200h_algorithm_reset_fanout.ps1`
 
 Expected: `FAIL` mentioning the existing 4,383-load `algorithm_system.core_rst_n` reset cone.
 
@@ -57,8 +57,8 @@ Do not inspect RTL text.  The assertion must consume the PDS netlist report so i
 - Modify: `rtl/algorithm/distortion/distortion_image_pipeline.sv`
 - Modify: `rtl/platform/common/memory/cached_pixel_fetch_engine.sv`
 - Modify: `rtl/algorithm/distortion/distortion_core_optimized.sv`
-- Modify: `boards/pgl50h/pds/pgl50h_rtl_synth/pgl50h_rtl_synth.pds`
-- Modify: `boards/pgl50h/pds/pgl50h_rtl_synth/impl.tcl`
+- Modify: `boards/pg2l200h/pds/pg2l200h_rtl_synth/pg2l200h_rtl_synth.pds`
+- Modify: `boards/pg2l200h/pds/pg2l200h_rtl_synth/impl.tcl`
 - Test: `sim/tb_distortion_pipeline_fifo_decouple.sv`
 - Test command: `sim/run_distortion_pipeline_fifo_decouple.ps1`
 
@@ -90,10 +90,10 @@ module algorithm_reset_tree (
     output wire geometry_rst_n, output wire fifo_rst_n,
     output wire fetch_control_rst_n, output wire fetch_storage_rst_n
 );
-    mes50hp_reset_sync geometry_sync (.clk(clk), .reset_n(reset_n), .rst_n(geometry_rst_n));
-    mes50hp_reset_sync fifo_sync     (.clk(clk), .reset_n(reset_n), .rst_n(fifo_rst_n));
-    mes50hp_reset_sync control_sync  (.clk(clk), .reset_n(reset_n), .rst_n(fetch_control_rst_n));
-    mes50hp_reset_sync storage_sync  (.clk(clk), .reset_n(reset_n), .rst_n(fetch_storage_rst_n));
+    pg2l200h_reset_sync geometry_sync (.clk(clk), .reset_n(reset_n), .rst_n(geometry_rst_n));
+    pg2l200h_reset_sync fifo_sync     (.clk(clk), .reset_n(reset_n), .rst_n(fifo_rst_n));
+    pg2l200h_reset_sync control_sync  (.clk(clk), .reset_n(reset_n), .rst_n(fetch_control_rst_n));
+    pg2l200h_reset_sync storage_sync  (.clk(clk), .reset_n(reset_n), .rst_n(fetch_storage_rst_n));
 endmodule
 ```
 
@@ -105,7 +105,7 @@ Run:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\run_distortion_pipeline_fifo_decouple.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\run_pgl50h_board_top_compile.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\run_pg2l200h_board_top_compile.ps1
 ```
 
 Expected: both report `TEST_PASS`.
@@ -177,8 +177,8 @@ Expected: every test reports `TEST_PASS`.
 **Files:**
 - Modify: `rtl/guide/畸变矫正图像与板载仿真流程.md`
 - Modify: `rtl/guide/RTL模块总览.md`
-- Test command: `sim/run_720p30_throughput.ps1`
-- Test command: `sim/run_mes50hp_top_cache_image_720p.ps1`
+- Test command: `sim/run_720p60_throughput.ps1`
+- Test command: `sim/run_distortion_frame_processor_cache_image_720p.ps1`
 
 **Interfaces:**
 - Consumes: unchanged 1280x720 image assets and the PDS project source list.
@@ -189,9 +189,9 @@ Expected: every test reports `TEST_PASS`.
 Run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\run_720p30_throughput.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\run_mes50hp_top_cache_image_720p.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\run_pgl50h_board_top_compile.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\run_720p60_throughput.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\run_distortion_frame_processor_cache_image_720p.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\run_pg2l200h_board_top_compile.ps1
 ```
 
 Expected: 720p output exactly matches the golden RGB888 image, all 921,600 pixels complete, and frame cycles remain below 2,500,000.
@@ -202,10 +202,10 @@ Document that image payload RAM is intentionally not reset, list the validity/po
 
 - [ ] **Step 3: User runs PDS and the acceptance check**
 
-The user reopens `boards/pgl50h/pds/pgl50h_rtl_synth/pgl50h_rtl_synth.pds`, runs Compile and Synthesize, then runs:
+The user reopens `boards/pg2l200h/pds/pg2l200h_rtl_synth/pg2l200h_rtl_synth.pds`, runs Compile and Synthesize, then runs:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\check_pgl50h_algorithm_reset_fanout.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\sim\check_pg2l200h_algorithm_reset_fanout.ps1
 ```
 
 Only then run Place & Route.  Success criterion: the check passes and detailed routing reaches zero unrouted nets; timing is evaluated only after routing completes.

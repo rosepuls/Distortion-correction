@@ -1,16 +1,16 @@
-# 1080P30 Throughput Architecture Implementation Plan
+# 720P60 Throughput Architecture Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task with review checkpoints.
 
-**Goal:** Replace the current four-single-pixel DDR read path with a measurable 1080P30 RGBX8888 burst and Tile Cache pipeline that can sustain the complete 1920×1080 raster at a 100 MHz algorithm clock.
+**Goal:** Replace the current four-single-pixel DDR read path with a measurable 720P60 RGBX8888 burst and Tile Cache pipeline that can sustain the complete 1920×1080 raster at a 100 MHz algorithm clock.
 
-**Architecture:** The work is split into three independently testable layers. First, the software model becomes a full-raster physical DDR traffic model. Second, vendor-neutral RTL implements a 512-entry coordinate FIFO boundary, a 32×4 eight-way skewed-index Tile Cache, and a four-bank 2×2 neighborhood path. Third, the PGL50H board wrapper adopts RGBX8888 Ping-Pong frame buffers and 1080P30 video timing. The legacy single-pixel path remains available for functional regression until the cached path passes image and throughput tests.
+**Architecture:** The work is split into three independently testable layers. First, the software model becomes a full-raster physical DDR traffic model. Second, vendor-neutral RTL implements a 512-entry coordinate FIFO boundary, a 32×4 eight-way skewed-index Tile Cache, and a four-bank 2×2 neighborhood path. Third, the PG2L200H board wrapper adopts RGBX8888 Ping-Pong frame buffers and 720P60 video timing. The legacy single-pixel path remains available for functional regression until the cached path passes image and throughput tests.
 
-**Tech Stack:** Python 3, `unittest`, NumPy, SystemVerilog, existing DDR behavior model, PDS-generated DDR3/PLL IP, MES50HP vendor RTL, PowerShell simulation runners.
+**Tech Stack:** Python 3, `unittest`, NumPy, SystemVerilog, existing DDR behavior model, PDS-generated DDR3/PLL IP, 盘古200Pro+ vendor RTL, PowerShell simulation runners.
 
 ## Global Constraints
 
-- Formal target is `1920×1080 @ 30 fps`; 1080P60 is out of scope for this milestone.
+- Formal target is `1920×1080 @ 60 fps`; 1080P60 is out of scope for this milestone.
 - Algorithm and DDR user logic target is 100 MHz; frame budget is 3,333,333 cycles and average budget is 1.607 cycles/pixel.
 - Real-time frame storage format is RGBX8888; one DDR data beat is 256 bit and contains eight pixels.
 - First Tile Cache configuration is 32×4 pixels, 128 resident Tiles, 16 sets × 8 ways with `tile_x - tile_y + (tile_x >> 2)` skewed indexing, four data banks, and four 256-bit beats per Tile row.
@@ -22,14 +22,14 @@
 
 ---
 
-### Task 1: Establish the 1080P30 full-raster traffic model
+### Task 1: Establish the 720P60 full-raster traffic model
 
 **Files:**
 - Modify: `software/cache_model.py`
 - Modify: `scripts/evaluate_pixel_fetch_cache.py`
 - Modify: `tests/test_cache_model.py`
 - Create: `tests/test_throughput_model.py`
-- Create: `docs/reports/pixel_fetch_cache_1080p30.md`
+- Create: `docs/reports/pixel_fetch_cache_720p60.md`
 
 **Interfaces:**
 - `CacheConfig` gains `set_count`, `ways`, `pixel_bytes`, and `burst_beats` while retaining compatibility with `NO_CACHE` for existing tests.
@@ -72,7 +72,7 @@ Use `tile_x - tile_y + (tile_x >> 2)` modulo `set_count` as the deterministic sk
 
 - [ ] **Step 4: Replace sparse report generation with complete 1920×1080 raster evaluation.**
 
-Use all coordinates from `np.indices((height, width))`, retain the existing fixed-point camera model, and report per-frame bytes, bytes per second at 30 fps, cache hit rate, burst count, and estimated total traffic for input write + source read + output write + display read.
+Use all coordinates from `np.indices((height, width))`, retain the existing fixed-point camera model, and report per-frame bytes, bytes per second at 60 fps, cache hit rate, burst count, and estimated total traffic for input write + source read + output write + display read.
 
 - [ ] **Step 5: Run the focused and existing Python tests.**
 
@@ -80,7 +80,7 @@ Run:
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
-python scripts/evaluate_pixel_fetch_cache.py --output docs/reports/pixel_fetch_cache_1080p30.md
+python scripts/evaluate_pixel_fetch_cache.py --output docs/reports/pixel_fetch_cache_720p60.md
 ```
 
 Expected: all tests pass, the report contains exactly 1920×1080 output coordinates, and the 32×4/128-entry candidate reports source traffic below the 10 MB/frame design threshold for the representative camera models.
@@ -88,8 +88,8 @@ Expected: all tests pass, the report contains exactly 1920×1080 output coordina
 - [ ] **Step 6: Commit the model milestone.**
 
 ```powershell
-git add software/cache_model.py scripts/evaluate_pixel_fetch_cache.py tests/test_cache_model.py tests/test_throughput_model.py docs/reports/pixel_fetch_cache_1080p30.md
-git commit -m "test: establish full raster 1080p30 traffic baseline"
+git add software/cache_model.py scripts/evaluate_pixel_fetch_cache.py tests/test_cache_model.py tests/test_throughput_model.py docs/reports/pixel_fetch_cache_720p60.md
+git commit -m "test: establish full raster 720p60 traffic baseline"
 ```
 
 ### Task 2: Add the RGBX8888 DDR address and burst model
@@ -128,7 +128,7 @@ Reject negative coordinates and dimensions that are not positive. Align each row
 
 - [ ] **Step 4: Add total-bandwidth calculations and boundary tests.**
 
-Cover `x=0`, `x=width-1`, `y=0`, `y=height-1`, a Tile crossing the right edge, and the 1920×1080 frame totals. The 1080P30 four-frame-stream baseline must equal `1920 * 1080 * 4 * 30 * 4 = 995,328,000` bytes per second before cache-fill overhead.
+Cover `x=0`, `x=width-1`, `y=0`, `y=height-1`, a Tile crossing the right edge, and the 1920×1080 frame totals. The 720P60 four-frame-stream baseline must equal `1920 * 1080 * 4 * 30 * 4 = 995,328,000` bytes per second before cache-fill overhead.
 
 - [ ] **Step 5: Run all Python tests and commit.**
 
@@ -263,7 +263,7 @@ git commit -m "feat: add eight-way RGBX Tile Cache"
 - Create: `rtl/memory/cached_pixel_fetch_engine.sv`
 - Modify: `rtl/interpolation/bilinear_interp.sv`
 - Modify: `rtl/distortion/distortion_image_pipeline.sv`
-- Modify: `rtl/board/mes50hp/mes50hp_top.sv`
+- Modify: `rtl/board/pg2l200h/distortion_frame_processor.sv`
 - Create: `sim/tb_cached_pixel_fetch_engine.sv`
 - Create: `sim/run_cached_pixel_fetch_engine.ps1`
 
@@ -297,26 +297,26 @@ Expected: pixel output matches the existing golden image, single-pixel DDR reque
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
-powershell -ExecutionPolicy Bypass -File sim/run_mes50hp_top_image.ps1
-git add rtl/memory/cached_pixel_fetch_engine.sv rtl/interpolation/bilinear_interp.sv rtl/distortion/distortion_image_pipeline.sv rtl/board/mes50hp/mes50hp_top.sv sim/tb_cached_pixel_fetch_engine.sv sim/run_cached_pixel_fetch_engine.ps1
+powershell -ExecutionPolicy Bypass -File sim/run_pg2l200h_board_top_compile.ps1
+git add rtl/memory/cached_pixel_fetch_engine.sv rtl/interpolation/bilinear_interp.sv rtl/distortion/distortion_image_pipeline.sv rtl/board/pg2l200h/distortion_frame_processor.sv sim/tb_cached_pixel_fetch_engine.sv sim/run_cached_pixel_fetch_engine.ps1
 git commit -m "feat: integrate cached pixel fetch with bilinear output"
 ```
 
-### Task 7: Add 1080P30 video mode and RGBX8888 Ping-Pong frame buffers
+### Task 7: Add 720P60 video mode and RGBX8888 Ping-Pong frame buffers
 
 **Files:**
-- Create: `rtl/board/mes50hp/video_mode_1080p30.sv`
-- Modify: `rtl/board/mes50hp/pgl50h_board_top.sv`
-- Modify: `rtl/board/mes50hp/algorithm_frame_writer.sv`
-- Modify: `rtl/board/mes50hp/ddr3_frame_reader.sv`
-- Modify: `rtl/board/mes50hp/board_video_control.sv`
+- Create: `rtl/board/pg2l200h/video_mode_720p60.sv`
+- Modify: `rtl/board/pg2l200h/pg2l200h_board_top.sv`
+- Modify: `rtl/board/pg2l200h/algorithm_frame_writer.sv`
+- Modify: `rtl/board/pg2l200h/ddr3_frame_reader.sv`
+- Modify: `rtl/board/pg2l200h/board_video_control.sv`
 - Modify: `sim/tb_algorithm_frame_writer.sv`
 - Modify: `sim/tb_ddr3_frame_reader.sv`
-- Create: `sim/tb_video_mode_1080p30.sv`
-- Create: `sim/run_video_mode_1080p30.ps1`
+- Create: `sim/tb_video_mode_720p60.sv`
+- Create: `sim/run_video_mode_720p60.ps1`
 
 **Interfaces:**
-- `video_mode_1080p30` produces `hs`, `vs`, `de`, `x`, `y`, and `frame_start` at 74.25 MHz using totals H=2200 and V=1125.
+- `video_mode_720p60` produces `hs`, `vs`, `de`, `x`, `y`, and `frame_start` at 74.25 MHz using totals H=2200 and V=1125.
 - Frame writers/readers use 32-bit RGBX words and 256-bit DDR bursts.
 - Board parameters become `IMAGE_WIDTH=1920`, `IMAGE_HEIGHT=1080`, `PIXEL_BYTES=4`, and separate input/output frame bases.
 
@@ -327,10 +327,10 @@ Assert exactly 2200 pixel-clock positions per line, 1125 lines per frame, 1920×
 - [ ] **Step 2: Run timing tests and confirm the new mode is absent or still fixed at 720P.**
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File sim/run_video_mode_1080p30.ps1
+powershell -ExecutionPolicy Bypass -File sim/run_video_mode_720p60.ps1
 ```
 
-- [ ] **Step 3: Implement the parameterized 1080P30 timing wrapper.**
+- [ ] **Step 3: Implement the parameterized 720P60 timing wrapper.**
 
 Keep vendor HDMI initialization unchanged. Put only mode timing and user data packing in project-owned files. Do not modify the imported vendor `sync_vg.v` in place.
 
@@ -343,23 +343,23 @@ Capture one complete RGBX input frame, process only a complete Ping-Pong input f
 ```powershell
 powershell -ExecutionPolicy Bypass -File sim/run_algorithm_frame_writer.ps1
 powershell -ExecutionPolicy Bypass -File sim/run_ddr3_frame_reader.ps1
-powershell -ExecutionPolicy Bypass -File sim/run_pgl50h_board_top_compile.ps1
+powershell -ExecutionPolicy Bypass -File sim/run_pg2l200h_board_top_compile.ps1
 ```
 
 - [ ] **Step 6: Commit the board mode milestone.**
 
 ```powershell
-git add rtl/board/mes50hp sim/tb_algorithm_frame_writer.sv sim/tb_ddr3_frame_reader.sv sim/tb_video_mode_1080p30.sv sim/run_video_mode_1080p30.ps1
-git commit -m "feat: add 1080p30 RGBX frame path"
+git add rtl/board/pg2l200h sim/tb_algorithm_frame_writer.sv sim/tb_ddr3_frame_reader.sv sim/tb_video_mode_720p60.sv sim/run_video_mode_720p60.ps1
+git commit -m "feat: add 720p60 RGBX frame path"
 ```
 
-### Task 8: Prove full-frame 1080P30 throughput under DDR contention
+### Task 8: Prove full-frame 720P60 throughput under DDR contention
 
 **Files:**
 - Modify: `sim/models/ddr_behavior_model.sv`
-- Create: `sim/tb_1080p30_throughput.sv`
-- Create: `sim/run_1080p30_throughput.ps1`
-- Create: `docs/reports/1080p30_throughput_report.md`
+- Create: `sim/tb_720p60_throughput.sv`
+- Create: `sim/run_720p60_throughput.ps1`
+- Create: `docs/reports/720p60_throughput_report.md`
 
 **Interfaces:**
 - DDR model exposes counters for command count, 256-bit beats, source bytes, input-write bytes, output-write bytes, display-read bytes, stalls, underflows, and overflows.
@@ -377,7 +377,7 @@ assert (!coordinate_fifo_overflow && !coordinate_fifo_underflow);
 - [ ] **Step 2: Run the throughput test against the current cached path.**
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File sim/run_1080p30_throughput.ps1
+powershell -ExecutionPolicy Bypass -File sim/run_720p60_throughput.ps1
 ```
 
 Expected initial failure: the cached path may exceed the frame budget under the worst configured DDR latency. Record the measured miss penalty before changing RTL.
@@ -393,25 +393,25 @@ Run identity, barrel, and pincushion maps with 3–11 cycle variable read latenc
 - [ ] **Step 5: Save the report and commit.**
 
 ```powershell
-git add sim/models/ddr_behavior_model.sv sim/tb_1080p30_throughput.sv sim/run_1080p30_throughput.ps1 docs/reports/1080p30_throughput_report.md
-git commit -m "test: verify 1080p30 throughput budget"
+git add sim/models/ddr_behavior_model.sv sim/tb_720p60_throughput.sv sim/run_720p60_throughput.ps1 docs/reports/720p60_throughput_report.md
+git commit -m "test: verify 720p60 throughput budget"
 ```
 
 ### Task 9: Run PDS synthesis, timing, and resource gates
 
 **Files:**
-- Modify: `pds/pgl50h_rtl_synth/pgl50h_rtl_synth.pds`
-- Modify: `constraints/mes50hp/pgl50h_board_top.fdc`
-- Create: `docs/reports/2026-10-02-1080p30-pds-results.md`
+- Modify: `pds/pg2l200h_rtl_synth/pg2l200h_rtl_synth.pds`
+- Modify: `constraints/pg2l200h/pg2l200h_board_top.fdc`
+- Create: `docs/reports/2026-10-02-720p60-pds-results.md`
 
 - [ ] **Step 1: Run the vendor-neutral RTL simulation suite before PDS.**
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py" -v
-powershell -ExecutionPolicy Bypass -File sim/run_1080p30_throughput.ps1
+powershell -ExecutionPolicy Bypass -File sim/run_720p60_throughput.ps1
 ```
 
-- [ ] **Step 2: Import the cached RTL and 1080P30 board sources into the existing PDS project.**
+- [ ] **Step 2: Import the cached RTL and 720P60 board sources into the existing PDS project.**
 
 Keep DDR3/PLL IP generated by the installed PDS version. Do not copy a different PDS version's generated implementation directory into the project.
 
@@ -426,8 +426,8 @@ Pipeline Tag comparison and Tile-way selection first, register the four-bank out
 - [ ] **Step 5: Save the PDS report and commit only curated reports and project sources.**
 
 ```powershell
-git add pds/pgl50h_rtl_synth/pgl50h_rtl_synth.pds constraints/mes50hp/pgl50h_board_top.fdc docs/reports/2026-10-02-1080p30-pds-results.md
-git commit -m "build: close 1080p30 PDS timing baseline"
+git add pds/pg2l200h_rtl_synth/pg2l200h_rtl_synth.pds constraints/pg2l200h/pg2l200h_board_top.fdc docs/reports/2026-10-02-720p60-pds-results.md
+git commit -m "build: close 720p60 PDS timing baseline"
 ```
 
 ## Completion Checklist
@@ -436,6 +436,6 @@ git commit -m "build: close 1080p30 PDS timing baseline"
 - [ ] RGBX8888 address and burst behavior is covered by unit tests.
 - [ ] Coordinate FIFO, burst reader, Tile Cache, and cached Pixel Fetch each have focused RTL tests.
 - [ ] Cached output matches the Python golden image on small and full-frame tests.
-- [ ] 1080P30 timing and Ping-Pong frame buffers pass board-structure simulation.
+- [ ] 720P60 timing and Ping-Pong frame buffers pass board-structure simulation.
 - [ ] Full-frame throughput stays within 3,333,333 cycles at 100 MHz under modeled DDR contention.
 - [ ] PDS resource and timing results are recorded; generated build directories remain untracked.

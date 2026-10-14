@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan.
 
-**Goal:** Convert the optimized distortion mapper into a 13-cycle, one-coordinate-per-clock, bit-exact pipeline that removes the current PGL50H normalization, tangential, and source-coordinate critical paths.
+**Goal:** Convert the optimized distortion mapper into a 13-cycle, one-coordinate-per-clock, bit-exact pipeline that removes the current PG2L200H normalization, tangential, and source-coordinate critical paths.
 
 **Architecture:** Add S1C between S0 and S1 for centered-coordinate/inverse-focal registers, then register full-width radial/tangential products, quantized tangential terms, tangential sums, distorted sums, focal products, and final Q19 source coordinates in separate stages. Register `coordinate_split` outputs on the thirteenth edge. Propagate valid/SOF/EOL and required intrinsics through every stage.
 
@@ -64,8 +64,8 @@
 ### Task 6: Run integration regression
 
 **Files:**
-- Test: `sim/run_mes50hp_top_image.ps1`
-- Test: `sim/run_pgl50h_board_top_compile.ps1`
+- Test: `sim/run_pg2l200h_board_top_compile.ps1`
+- Test: `sim/run_pg2l200h_board_top_compile.ps1`
 
 1. Run the image-level top simulation and compare its output to the existing golden result.
 2. Run the board-top compile/elaboration simulation.

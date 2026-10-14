@@ -2,7 +2,7 @@
 
 ## Goal
 
-Refactor `distortion_core_optimized.sv` so the PGL50H implementation has short, explicit register-to-register arithmetic paths at the 100 MHz `ddrphy_clkin` clock. The mapper must remain bit-exact with the existing Q-format model, retain the existing module interface, and accept one coordinate every clock.
+Refactor `distortion_core_optimized.sv` so the PG2L200H implementation has short, explicit register-to-register arithmetic paths at the 100 MHz `ddrphy_clkin` clock. The mapper must remain bit-exact with the existing Q-format model, retain the existing module interface, and accept one coordinate every clock.
 
 ## Constraints
 
@@ -53,6 +53,6 @@ The tangential bases `r^2 + 2*x^2` and `r^2 + 2*y^2` use a signed 22-bit registe
 
 1. Golden-vector unit test checks the existing 25 bit-accurate vectors at 13-cycle latency.
 2. A dedicated streaming test drives back-to-back coordinates, bubbles, SOF/EOL markers, and two frame configurations to prove one-coordinate-per-clock operation and metadata alignment.
-3. The image-level `mes50hp_top` simulation must still reproduce its golden image.
+3. The image-level `distortion_frame_processor` simulation must still reproduce its golden image.
 4. The board-top compile simulation must elaborate and complete.
 5. PDS Stage 0 preservation check must continue to find all protected registers after the user's next synthesis run.

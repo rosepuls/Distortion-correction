@@ -2,7 +2,7 @@
 
 ## 目标
 
-将可复用的图像算法、与器件无关的平台逻辑，以及 PGL50H 专属逻辑分离。新增一块板卡时，应只新增对应的 `board`、`vendor`、`boards` 子树和实现相同平台接口的适配器，不应改动算法 RTL。
+将可复用的图像算法、与器件无关的平台逻辑，以及 PG2L200H 专属逻辑分离。新增一块板卡时，应只新增对应的 `board`、`vendor`、`boards` 子树和实现相同平台接口的适配器，不应改动算法 RTL。
 
 ## 目标目录
 
@@ -15,11 +15,11 @@ rtl/
     detect/
   platform/common/
     memory/
-  board/pgl50h/
-  vendor/pgl50h/
-boards/pgl50h/
+  board/pg2l200h/
+  vendor/pg2l200h/
+boards/pg2l200h/
   constraints/
-  pds/pgl50h_rtl_synth/
+  pds/pg2l200h_rtl_synth/
 ```
 
 `ip/pango/` 暂时保持原位：其中是 Pango 工具生成的 IP，避免为了目录美观而破坏其内部相对路径。后续新增板卡应在各自 `boards/<board>/` 下维护 PDS、约束和 IP 生成说明。
@@ -33,7 +33,7 @@ boards/pgl50h/
 
 ## 迁移后新增板卡的最小工作量
 
-1. 复制 `boards/pgl50h/` 的工程组织方式，建立 `boards/<new-board>/`。
+1. 复制 `boards/pg2l200h/` 的工程组织方式，建立 `boards/<new-board>/`。
 2. 新增 `rtl/board/<new-board>/`：物理顶层、时钟复位、输入输出和 DDR 适配。
 3. 新增 `rtl/vendor/<new-board>/`：只放供应商例程或该板专用 IP 封装。
 4. 保持 `rtl/algorithm/` 与 `rtl/platform/common/` 不变，通过相同的像素/帧缓存接口接入。

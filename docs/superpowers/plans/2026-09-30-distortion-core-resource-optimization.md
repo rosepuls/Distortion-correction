@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Reduce the PGL50H APM use of the 1-pixel-per-clock Brown-Conrady coordinate core from 84 to no more than 40 while bounding coordinate error against the current full-precision fixed-point reference.
+**Goal:** Reduce the PG2L200H APM use of the 1-pixel-per-clock Brown-Conrady coordinate core from 84 to no more than 40 while bounding coordinate error against the current full-precision fixed-point reference.
 
 **Architecture:** Keep `distortion_core.sv` as the bit-accurate baseline. Add a Python candidate-format model that rescales the existing Q13.19/Q2.30/Q4.28 external configuration to narrow internal operands, uses the Horner radial form, and measures error/range on deterministic camera sweeps. Implement the accepted candidate in a separate, port-compatible optimized core, then compare it with the baseline in XSim and PDS synthesis.
 
-**Tech Stack:** Python 3.13, NumPy, `unittest`, SystemVerilog, Vivado XSim 2020.2, PDS 2022.2-SP6.4 / PGL50H-6IFBG484.
+**Tech Stack:** Python 3.13, NumPy, `unittest`, SystemVerilog, Vivado XSim 2020.2, PDS 2022.2-SP6.4 / PG2L200H-6FBB676.
 
 ## Global Constraints
 
@@ -14,7 +14,7 @@
 - Keep 1 coordinate per valid clock and `valid/sof/eol` alignment.
 - Keep Q13.19 `src_x/src_y`, integer floor, Q0.16 fraction, and black-border `coord_valid` semantics.
 - Compare against the existing `source_coordinates_fixed` baseline; max error ≤ 1/16 pixel, mean error ≤ 1/64 pixel, and zero `coord_valid` mismatch.
-- The optimized core must use ≤ 40 PGL50H APM in `Compile → Synthesize`.
+- The optimized core must use ≤ 40 PG2L200H APM in `Compile → Synthesize`.
 - Do not run Device Map on the standalone optimized core; its analysis interface has more physical I/O than the device.
 - This repository has no baseline commit; do not create commits during this work.
 
@@ -288,7 +288,7 @@ Expected: `TEST_PASS: distortion_core_optimized`.
 **Files:**
 - Modify: `docs/numeric_spec.md`
 - Modify: `docs/interface_spec.md`
-- Modify: `pds/pgl50h_rtl_synth/rtl_1/pds_resource_timing_summary.md`
+- Modify: `pds/pg2l200h_rtl_synth/rtl_1/pds_resource_timing_summary.md`
 - Modify: `sim/xsim_simulation_guide.md`
 
 **Interfaces:**
@@ -323,7 +323,7 @@ In PDS, add `coordinate_split.sv` and `distortion_core_optimized.sv`, set `disto
 create_clock -name clk -period 20.000 [get_ports {clk}]
 ```
 
-Run only Compile and Synthesize. Do not start Device Map because this module-level analysis top exposes more I/O than PGL50H.
+Run only Compile and Synthesize. Do not start Device Map because this module-level analysis top exposes more I/O than PG2L200H.
 
 - [ ] **Step 4: Run the resource-gate test**
 

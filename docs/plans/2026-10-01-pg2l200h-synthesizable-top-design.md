@@ -1,10 +1,10 @@
-# PGL50H 可综合算法系统顶层设计
+# PG2L200H 可综合算法系统顶层设计
 
 ## 目标
 
-建立可在紫光同创 PGL50H 上综合的算法系统顶层 `mes50hp_top`，将已经验证的畸变矫正数据通路组合为一个可自动处理整帧图像的模块，并通过图片级 XSim 回归验证。
+建立可在紫光同创 PG2L200H 上综合的算法系统顶层 `distortion_frame_processor`，将已经验证的畸变矫正数据通路组合为一个可自动处理整帧图像的模块，并通过图片级 XSim 回归验证。
 
-本阶段的顶层边界位于 FPGA 用户逻辑与厂商 DDR3/视频接口 IP 之间。DDR3 PHY、HDMI/摄像头物理引脚和时钟 IP 必须在拿到 MES50HP 官方例程后接入，不在本阶段猜测或伪造。
+本阶段的顶层边界位于 FPGA 用户逻辑与厂商 DDR3/视频接口 IP 之间。DDR3 PHY、HDMI/摄像头物理引脚和时钟 IP 必须在拿到 盘古200Pro+ 官方例程后接入，不在本阶段猜测或伪造。
 
 ## 数据通路
 
@@ -20,7 +20,7 @@
 
 ## 时钟与复位
 
-- 顶层输入时钟端口名为 `clk`，本阶段按 MES50HP 板载 50 MHz 系统时钟验证。
+- `distortion_frame_processor` 的算法时钟端口名为 `clk`，频率由板级 `ddr3_test` 的 `core_clk` 决定；物理顶层 `pg2l200h_board_top` 使用 27 MHz `sys_clk` 与 125 MHz DDR 差分参考时钟。
 - 外部低有效复位 `reset_n` 异步拉低，在 `clk` 域内经两级寄存器同步释放。
 - `frame_start` 和相机参数输入均属于 `clk` 域。
 
@@ -35,7 +35,7 @@
 
 ## 综合策略
 
-`distortion_image_pipeline` 增加参数化核心选择，默认仍使用原基准核心以保持已有回归不变；`mes50hp_top` 显式选择已经单独验证过的 Q18 窄位宽 `distortion_core_optimized`，以降低 PGL50H 上的乘法器和寄存器压力。
+`distortion_image_pipeline` 增加参数化核心选择，默认仍使用原基准核心以保持已有回归不变；`distortion_frame_processor` 显式选择已经单独验证过的 Q18 窄位宽 `distortion_core_optimized`，以降低 PG2L200H 上的乘法器和寄存器压力。
 
 ## 验证标准
 
@@ -48,4 +48,4 @@
 - DDR 请求地址不越界；
 - `frame_done` 只在最后一个输出像素时产生。
 
-仿真中间文件和日志存放在 `xsim.dir/mes50hp_top_image_256x192`，图片与 MEM 结果存放在 `result/sim_assets/mes50hp_top_image_256x192`。
+仿真中间文件和日志存放在 `xsim.dir/distortion_frame_processor_image_256x192`，图片与 MEM 结果存放在 `result/sim_assets/distortion_frame_processor_image_256x192`。

@@ -1,23 +1,23 @@
-# PGL50H 时序收敛实施计划
+# PG2L200H 时序收敛实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` or `executing-plans` to implement this plan task-by-task. 每个任务完成后都必须运行对应的仿真或 PDS 检查，并记录结果。
 
-**目标：** 在保持 100 MHz 核心时钟、720p30 吞吐率和图像结果不变的前提下，使 PGL50H 完整 RTL 工程的 setup、hold、recovery 和 removal 时序全部收敛，并具备生成下载文件和上板测试的条件。
+**目标：** 在保持 100 MHz 核心时钟、720p60 吞吐率和图像结果不变的前提下，使 PG2L200H 完整 RTL 工程的 setup、hold、recovery 和 removal 时序全部收敛，并具备生成下载文件和上板测试的条件。
 
-**架构：** 先用快速 P&R 工程筛选算法核心和缓存 RTL 的局部修改，再用完整 `pgl50h_rtl_synth` 工程进行唯一正式签核。主要改动分为三条路径：将 Coordinate FIFO 改为同步 RAM/寄存器输出、将 Tile Cache 查询拆成保持一拍吞吐率的流水线、切分畸变核心的径向乘法链；最后单独处理复位 recovery 和小幅 hold 违例。
+**架构：** 先用快速 P&R 工程筛选算法核心和缓存 RTL 的局部修改，再用完整 `pg2l200h_rtl_synth` 工程进行唯一正式签核。主要改动分为三条路径：将 Coordinate FIFO 改为同步 RAM/寄存器输出、将 Tile Cache 查询拆成保持一拍吞吐率的流水线、切分畸变核心的径向乘法链；最后单独处理复位 recovery 和小幅 hold 违例。
 
-**技术栈：** SystemVerilog、PGL50H PDS/Fabric Compiler、XSim、PGL DRM/APM 资源、PGL50H FDC 时序约束。
+**技术栈：** SystemVerilog、PG2L200H PDS/Fabric Compiler、XSim、PGL DRM/APM 资源、PG2L200H FDC 时序约束。
 
 ## 全局约束
 
 - 核心算法时钟保持 100 MHz，不通过降低频率规避时序问题。
-- 目标模式保持 1280×720@30。
-- 720p30 单帧处理周期不超过 `TARGET_BUDGET = 2,500,000`。
+- 目标模式保持 1280×720@60。
+- 720p60 单帧处理周期不超过 `TARGET_BUDGET = 2,500,000`。
 - Tile Cache 保持 16 Set × 4 Way、PLRU 配置。
 - Coordinate FIFO 保持深度 544，并保留 32 个保护槽。
 - 不改变定点位宽、移位位置、饱和规则和图像算法数学结果。
 - 不使用覆盖真实数据路径的全局 `false_path` 或 `multicycle_path`。
-- 快速 P&R 只用于快速反馈；完整 `pgl50h_rtl_synth` 是最终时序签核依据。
+- 快速 P&R 只用于快速反馈；完整 `pg2l200h_rtl_synth` 是最终时序签核依据。
 - RTL 修改前后都必须检查像素数量、像素顺序、SOF/EOL 和帧完成协议。
 
 ## 当前基线
@@ -34,9 +34,9 @@
 
 关键报告：
 
-- `boards/pgl50h/pds/pgl50h_fast_pr/place_route/pgl50h_fast_pr_top_timing_summary_after_hold_fix.txt`
-- `boards/pgl50h/pds/pgl50h_rtl_synth/place_route/pgl50h_board_top_timing_summary_after_hold_fix.txt`
-- `boards/pgl50h/pds/pgl50h_rtl_synth/report_timing/pgl50h_board_top.rtr`
+- `boards/pg2l200h/pds/pg2l200h_fast_pr/place_route/pg2l200h_fast_pr_top_timing_summary_after_hold_fix.txt`
+- `boards/pg2l200h/pds/pg2l200h_rtl_synth/place_route/pg2l200h_board_top_timing_summary_after_hold_fix.txt`
+- `boards/pg2l200h/pds/pg2l200h_rtl_synth/report_timing/pg2l200h_board_top.rtr`
 
 ---
 
@@ -47,12 +47,12 @@
 - [x] **Coordinate FIFO：同步存储与寄存器化输出。** 已将坐标、分数和 sideband 打包为 payload，改为 `head_payload` 输出的同步读路径；保留 544 深度、32 个保护槽、非二次幂回绕以及满载时同周期入队/出队。`tb_coordinate_fifo.sv` 已增加 `out_valid && !out_ready` 时 payload 稳定性检查。
 - [x] **Pixel Tile Cache：查询/缺失处理流水化。** 已完成固定宽度地址预解码、同步 Bank 读对齐、miss/refill 顺序阻塞、失效期间的重新检查和 Metadata FIFO 容量调整。生产参数的 Bank 地址已改为显式位拼接，避免移位表达式的位宽推断差异。
 - [x] **畸变核心：Horner 链切分。** `distortion_core_optimized.sv` 已增加 `stage2k`，把 `k2 × r²` 与 Horner 加法分到相邻周期；数据与全部 sideband 同步延迟，核心端到端延迟由 15 变为 16 周期。
-- [x] **功能、吞吐率与整图回归。** FIFO、Cache、缓存引擎、压力测试、畸变核心、板级编译和完整 720p 回归均通过。720p30 为 `921600` 像素、`1.329183 cycles/pixel`（`1,224,975` 核心周期），完整链路输出 `921600` 像素，RGB888 与 golden 逐像素一致。
+- [x] **功能、吞吐率与整图回归。** FIFO、Cache、缓存引擎、压力测试、畸变核心、板级编译和完整 720p 回归均通过。720p60 为 `921600` 像素、`1.329183 cycles/pixel`（`1,224,975` 核心周期），完整链路输出 `921600` 像素，RGB888 与 golden 逐像素一致。
 - [x] **仿真图片资产。** 已由整图回归覆盖 `result/sim_assets/cache_full_chain_1280x720/` 中的 golden、RTL 输出和对比图片。
 
 ### 最新完整 PDS 结果与剩余问题
 
-最新一次正式完整工程 `pgl50h_rtl_synth` 报告显示，FIFO/Cache/畸变核心优化已显著改善 setup：
+最新一次正式完整工程 `pg2l200h_rtl_synth` 报告显示，FIFO/Cache/畸变核心优化已显著改善 setup：
 
 | 类别 | 最新结果 | 状态 |
 |---|---:|---|
@@ -63,9 +63,9 @@
 
 当前最差**真实数据**路径来自 `cached_pixel_fetch_engine_inst/meta_count[10]` 到 `bilinear_interp_inst/s1_top_red[8]`，慢角 setup WNS 为 `-2.002 ns`。其组合锥为：Metadata FIFO 的计数/空判断 → `cache_response_fire` 对四路像素的宽数据选择 → 水平双线性差分与 APM 乘法 → Bilinear 第一级寄存器。该路径逻辑和布线延迟均接近一半，优先消除“valid 控制宽数据 mux”，而不改变算法或增加周期。
 
-快速 P&R 曾出现已删除旧信号的解析报错，因此其旧 WNS 不作为本轮判断依据；本文件的正式签核仍以用户运行的完整 `pgl50h_rtl_synth` 为准。
+快速 P&R 曾出现已删除旧信号的解析报错，因此其旧 WNS 不作为本轮判断依据；本文件的正式签核仍以用户运行的完整 `pg2l200h_rtl_synth` 为准。
 
-**2026-10-04 16:34 完整 PDS 更新：** Bilinear 入口的 `meta_count → s1_top_*` 路径已不再位于最差真实数据路径中，说明任务 4B 成功切断了该控制锥。当前 timing summary 的慢角 setup 为 WNS `-2.090 ns`、TNS `-323.444 ns`、297 endpoints，快角 setup 为 `+0.989 ns`；但慢角/快角 hold 分别出现 `-0.056 ns`（3 endpoints）与 `-0.100 ns`（13 endpoints），recovery 仍为慢角 `-4.250 ns`、快角 `-2.938 ns`。`pgl50h_board_top.rtr` 的最差真实数据路径已转移到畸变核心：平方 APM、饱和和 `x²+y²` 写入 `stage2_r2_q18`（约 `-2.191 ns`），其次为 `r² × Horner` 后的饱和/加法链（约 `-2.148 ns`）。
+**2026-10-04 16:34 完整 PDS 更新：** Bilinear 入口的 `meta_count → s1_top_*` 路径已不再位于最差真实数据路径中，说明任务 4B 成功切断了该控制锥。当前 timing summary 的慢角 setup 为 WNS `-2.090 ns`、TNS `-323.444 ns`、297 endpoints，快角 setup 为 `+0.989 ns`；但慢角/快角 hold 分别出现 `-0.056 ns`（3 endpoints）与 `-0.100 ns`（13 endpoints），recovery 仍为慢角 `-4.250 ns`、快角 `-2.938 ns`。`pg2l200h_board_top.rtr` 的最差真实数据路径已转移到畸变核心：平方 APM、饱和和 `x²+y²` 写入 `stage2_r2_q18`（约 `-2.191 ns`），其次为 `r² × Horner` 后的饱和/加法链（约 `-2.148 ns`）。
 
 ---
 
@@ -93,9 +93,9 @@
 
 - [x] **步骤 4：运行定向和全链路 XSim 回归。**
 
-  先运行 Bilinear 单元测试与缓存引擎测试，再运行畸变核心、720p30 吞吐率、板级编译和 `run_mes50hp_top_cache_image_720p.ps1`。整图必须再次覆盖 `result/sim_assets/cache_full_chain_1280x720/`，并满足 `921600` 像素、预算内周期和逐像素一致。
+  先运行 Bilinear 单元测试与缓存引擎测试，再运行畸变核心、720p60 吞吐率、板级编译和 `run_distortion_frame_processor_cache_image_720p.ps1`。整图必须再次覆盖 `result/sim_assets/cache_full_chain_1280x720/`，并满足 `921600` 像素、预算内周期和逐像素一致。
 
-  已完成：`TEST_PASS: bilinear_interp`、`TEST_PASS: cached_pixel_fetch_engine`、畸变核心 golden 与 stream（`latency=16`）、`TEST_PASS: 720p30_throughput`（`1,224,975` cycles）、`TEST_PASS: pgl50h_board_top_compile`，以及整图 `outputs=921600 commands=82716 beats=330864 cycles=1959088`。目标图片已于 15:56 重新生成。
+  已完成：`TEST_PASS: bilinear_interp`、`TEST_PASS: cached_pixel_fetch_engine`、畸变核心 golden 与 stream（`latency=16`）、`TEST_PASS: 720p60_throughput`（`1,224,975` cycles）、`TEST_PASS: pg2l200h_board_top_compile`，以及整图 `outputs=921600 commands=82716 beats=330864 cycles=1959088`。目标图片已于 15:56 重新生成。
 
 - [x] **步骤 5：由用户运行正式完整 PDS。**
 
@@ -131,9 +131,9 @@
 
 - [ ] **步骤 4：运行全链路回归并由用户执行完整 PDS。**
 
-  运行 720p30、板级编译与 1280×720 整图回归，重新覆盖图片资产；再检查平方路径是否消失、`r² × Horner` 是否成为下一最差路径，以及 hold/recovery 的变化。
+  运行 720p60、板级编译与 1280×720 整图回归，重新覆盖图片资产；再检查平方路径是否消失、`r² × Horner` 是否成为下一最差路径，以及 hold/recovery 的变化。
 
-  已完成仿真部分：720p30 仍为 `921600` 像素、`1,224,975` 周期、`1.329183 cycles/pixel`；`pgl50h_board_top_compile` 通过；整图回归为 `outputs=921600 commands=82716 beats=330864 cycles=1959088`，并已重新覆盖 `result/sim_assets/cache_full_chain_1280x720/`。待用户运行完整 PDS 后再完成本步骤。
+  已完成仿真部分：720p60 仍为 `921600` 像素、`1,224,975` 周期、`1.329183 cycles/pixel`；`pg2l200h_board_top_compile` 通过；整图回归为 `outputs=921600 commands=82716 beats=330864 cycles=1959088`，并已重新覆盖 `result/sim_assets/cache_full_chain_1280x720/`。待用户运行完整 PDS 后再完成本步骤。
 
 **后备方案（只在任务 4C 验证后再决定）：** 若 `r² × Horner → radial_q18` 成为剩余最差路径，则单独插入 `radial_delta_q18` 寄存级，把第二个径向 APM 乘法与 `1 + radial_delta` 饱和加法分离；同样先把固定延迟测试加一拍并验证失败，再改 RTL。不要与任务 4C 合并实施。
 
@@ -147,7 +147,7 @@
 
 - 修改：`rtl/algorithm/interpolation/bilinear_interp.sv`
 - 修改：`sim/tb_bilinear_interp.sv`
-- 验证：缓存引擎、720p30、板级编译和整图回归
+- 验证：缓存引擎、720p60、板级编译和整图回归
 
 - [x] **步骤 1：建立 3 周期失败测试。**
 
@@ -163,7 +163,7 @@
 
 - [x] **步骤 4：运行 XSim 全链路回归。**
 
-  `bilinear_interp`、`cached_pixel_fetch_engine` 和板级编译均通过；720p30 为 `921600` 像素、`1,224,976` 周期、`1.329184 cycles/pixel`；整图为 `921600` 输出像素、`82716` 命令、`330864` beat、`1959089` 周期，RGB888 逐像素一致。目标图片已重新覆盖。
+  `bilinear_interp`、`cached_pixel_fetch_engine` 和板级编译均通过；720p60 为 `921600` 像素、`1,224,976` 周期、`1.329184 cycles/pixel`；整图为 `921600` 输出像素、`82716` 命令、`330864` beat、`1959089` 周期，RGB888 逐像素一致。目标图片已重新覆盖。
 
 - [ ] **步骤 5：由用户运行完整 PDS。**
 
@@ -180,7 +180,7 @@
 - 修改：`rtl/algorithm/distortion/distortion_core_optimized.sv`
 - 修改：`sim/tb_distortion_core_optimized.sv`
 - 修改：`sim/tb_distortion_core_optimized_stream.sv`
-- 验证：`sim/run_distortion_core_optimized.ps1`、`sim/run_720p30_throughput.ps1`、`sim/run_pgl50h_board_top_compile.ps1`、`sim/run_mes50hp_top_cache_image_720p.ps1`
+- 验证：`sim/run_distortion_core_optimized.ps1`、`sim/run_720p60_throughput.ps1`、`sim/run_pg2l200h_board_top_compile.ps1`、`sim/run_distortion_frame_processor_cache_image_720p.ps1`
 
 - [x] **步骤 1：建立 18 周期的失败测试。**
 
@@ -192,7 +192,7 @@
 
 - [x] **步骤 3：完成 XSim 回归并重新生成图像资产。**
 
-  核心黄金向量 `25/25` 通过；流式回归通过并报告 `latency=18 checked=7`；720p30 仍为 `921600` 像素、`1,224,976` 周期、`1.329184 cycles/pixel`；PGL50H 板级顶层编译通过；完整 1280×720 链路输出 `921600` 像素、`82716` 命令、`330864` beat、`1959089` 周期，RGB888 与 golden frame 逐像素一致。`result/sim_assets/cache_full_chain_1280x720/` 已重新覆盖生成。
+  核心黄金向量 `25/25` 通过；流式回归通过并报告 `latency=18 checked=7`；720p60 仍为 `921600` 像素、`1,224,976` 周期、`1.329184 cycles/pixel`；PG2L200H 板级顶层编译通过；完整 1280×720 链路输出 `921600` 像素、`82716` 命令、`330864` beat、`1959089` 周期，RGB888 与 golden frame 逐像素一致。`result/sim_assets/cache_full_chain_1280x720/` 已重新覆盖生成。
 
 - [x] **步骤 4：由用户运行完整 PDS。**
 
@@ -206,7 +206,7 @@
 
 **根因：** Recovery 约束收敛后，最新正式完整工程仅剩 `ddrphy_clkin` 慢角 setup
 违例，timing summary 为 WNS `-0.312 ns`、TNS `-3.868 ns`、20 endpoints。详细
-`pgl50h_board_top.rtr` 的代表路径为
+`pg2l200h_board_top.rtr` 的代表路径为
 `stage2h_horner_t_q18[13] → radial_product → stage3d_radial_delta_q18[10]`，到达时间
 `20.550 ns`、要求时间 `20.174 ns`、slack `-0.376 ns`；APM 乘法和后续右移/饱和加法链仍在
 同一 100 MHz 周期中。这里的 `ddrphy_clkin` 是该算法逻辑所用时钟域名称，并非 DDR PHY IP
@@ -217,7 +217,7 @@
 - 修改：`rtl/algorithm/distortion/distortion_core_optimized.sv`
 - 修改：`sim/tb_distortion_core_optimized.sv`
 - 修改：`sim/tb_distortion_core_optimized_stream.sv`
-- 验证：`sim/run_distortion_core_optimized.ps1`、`sim/run_720p30_throughput.ps1`、`sim/run_pgl50h_board_top_compile.ps1`、`sim/run_mes50hp_top_cache_image_720p.ps1`
+- 验证：`sim/run_distortion_core_optimized.ps1`、`sim/run_720p60_throughput.ps1`、`sim/run_pg2l200h_board_top_compile.ps1`、`sim/run_distortion_frame_processor_cache_image_720p.ps1`
 
 - [x] **步骤 1：建立 19 周期 RED 门禁。**
 
@@ -238,12 +238,12 @@
 
 - [ ] **步骤 4：完成全链路回归，等待用户执行正式完整 PDS。**
 
-  已完成仿真：720p30 为 `921600` 像素、`1,224,976` 周期、`1.329184 cycles/pixel`；
-  `pgl50h_board_top_compile` 通过；完整 1280×720 链路为 `921600` 输出像素、`82716` 命令、
+  已完成仿真：720p60 为 `921600` 像素、`1,224,976` 周期、`1.329184 cycles/pixel`；
+  `pg2l200h_board_top_compile` 通过；完整 1280×720 链路为 `921600` 输出像素、`82716` 命令、
   `330864` beat、`1,959,089` 周期，RGB888 与黄金帧逐像素一致。
   `result/sim_assets/cache_full_chain_1280x720/` 已于 22:05 重新覆盖生成。
 
-  用户随后运行 `pgl50h_rtl_synth`，重点确认
+  用户随后运行 `pg2l200h_rtl_synth`，重点确认
   `stage2h_horner_t_q18 → stage3d_radial_delta_q18` 路径消失，慢角 setup 转正或显著改善，且
   setup/hold/recovery/removal 其他类别不回退。
 
@@ -259,7 +259,7 @@
 
 - 修改：`rtl/algorithm/interpolation/bilinear_interp.sv`
 - 修改：`sim/tb_bilinear_interp.sv`
-- 验证：缓存引擎、缓存吞吐率、缓存压力、畸变核心、720p30、板级编译和整图回归
+- 验证：缓存引擎、缓存吞吐率、缓存压力、畸变核心、720p60、板级编译和整图回归
 
 - [x] **步骤 1：建立 4 拍 RED 门禁。**
 
@@ -273,8 +273,8 @@
 
 - [x] **步骤 3：完成 XSim 全链路回归。**
 
-  Bilinear 单元、缓存引擎、缓存吞吐率、缓存压力、畸变核心黄金/流式、720p30 和板级编译
-  均通过。720p30 为 `921600` 像素、`1,224,977` 周期、`1.329185 cycles/pixel`；完整
+  Bilinear 单元、缓存引擎、缓存吞吐率、缓存压力、畸变核心黄金/流式、720p60 和板级编译
+  均通过。720p60 为 `921600` 像素、`1,224,977` 周期、`1.329185 cycles/pixel`；完整
   1280×720 链路为 `921600` 输出像素、`82716` 命令、`330864` beat、`1,959,090` 周期，
   RGB888 与黄金帧逐像素一致，图片资产已重新覆盖。
 
@@ -292,19 +292,19 @@
 - 检查：`sim/tb_coordinate_fifo.sv`
 - 检查：`sim/tb_pixel_tile_cache.sv`
 - 检查：`sim/tb_cached_pixel_fetch_stress.sv`
-- 检查：`sim/tb_720p30_throughput.sv`
-- 检查：`sim/run_720p30_throughput.ps1`
-- 检查：`sim/run_mes50hp_top_cache_image_720p.ps1`
+- 检查：`sim/tb_720p60_throughput.sv`
+- 检查：`sim/run_720p60_throughput.ps1`
+- 检查：`sim/run_distortion_frame_processor_cache_image_720p.ps1`
 
 **接口要求：**
 
 - 所有现有模块接口保持兼容。
 - 每次改动都必须能重新运行单元测试、压力测试、整图测试和吞吐率测试。
-- `tb_720p30_throughput.sv` 中的 `TARGET_BUDGET = 2500000` 不得删除或放宽。
+- `tb_720p60_throughput.sv` 中的 `TARGET_BUDGET = 2500000` 不得删除或放宽。
 
 - [ ] **步骤 1：确认当前基线测试全部通过。**
 
-  运行 FIFO、Tile Cache、缓存压力、720p30 吞吐率和 720p 图像测试，记录每个测试的 `TEST_PASS`、输出像素数、帧周期数和 DDR 命令数。
+  运行 FIFO、Tile Cache、缓存压力、720p60 吞吐率和 720p 图像测试，记录每个测试的 `TEST_PASS`、输出像素数、帧周期数和 DDR 命令数。
 
 - [ ] **步骤 2：补充 FIFO 输出稳定性检查。**
 
@@ -328,8 +328,8 @@
 
 - 修改：`rtl/platform/common/memory/coordinate_fifo.sv`
 - 必要时新增：`rtl/platform/common/memory/coordinate_fifo_ram.sv`
-- 必要时新增：`rtl/vendor/pgl50h/memory/pgl50h_coordinate_fifo_ram.v`
-- 必要时新增：`sim/pgl50h_coordinate_fifo_ram_model.sv`
+- 必要时新增：`rtl/vendor/pg2l200h/memory/pg2l200h_coordinate_fifo_ram.v`
+- 必要时新增：`sim/pg2l200h_coordinate_fifo_ram_model.sv`
 - 测试：`sim/tb_coordinate_fifo.sv`
 
 **接口要求：**
@@ -427,7 +427,7 @@
 
 - 修改：`rtl/algorithm/distortion/distortion_core_optimized.sv`
 - 测试：现有畸变核心测试和整图测试
-- P&R：`boards/pgl50h/pds/pgl50h_fast_pr`
+- P&R：`boards/pg2l200h/pds/pg2l200h_fast_pr`
 
 **接口要求：**
 
@@ -463,10 +463,10 @@
 
 **文件：**
 
-- 工程：`boards/pgl50h/pds/pgl50h_rtl_synth`
-- 约束：`boards/pgl50h/constraints/pgl50h_board_top.fdc`
-- 报告：`boards/pgl50h/pds/pgl50h_rtl_synth/place_route/`
-- 报告：`boards/pgl50h/pds/pgl50h_rtl_synth/report_timing/`
+- 工程：`boards/pg2l200h/pds/pg2l200h_rtl_synth`
+- 约束：`boards/pg2l200h/constraints/pg2l200h_board_top.fdc`
+- 报告：`boards/pg2l200h/pds/pg2l200h_rtl_synth/place_route/`
+- 报告：`boards/pg2l200h/pds/pg2l200h_rtl_synth/report_timing/`
 
 - [ ] **步骤 1：执行完整工程的 Compile、Synthesis、Device Map、Place & Route 和 Report Timing。**
 
@@ -490,10 +490,10 @@
 
 **文件：**
 
-- 修改：`rtl/board/pgl50h/clock_reset.sv`
-- 检查：`rtl/board/pgl50h/pgl50h_board_top.sv`
-- 修改：`boards/pgl50h/constraints/pgl50h_board_top.fdc`
-- 检查：`boards/pgl50h/pds/pgl50h_rtl_synth/constraint_check/`
+- 修改：`rtl/board/pg2l200h/clock_reset.sv`
+- 检查：`rtl/board/pg2l200h/pg2l200h_board_top.sv`
+- 修改：`boards/pg2l200h/constraints/pg2l200h_board_top.fdc`
+- 检查：`boards/pg2l200h/pds/pg2l200h_rtl_synth/constraint_check/`
 
 - [x] **步骤 1：确认 recovery 违例的起点和终点。**
 
@@ -524,14 +524,14 @@
 
 **2026-10-04 实现记录：** 首版 `set_false_path -to [get_pins ...]` 已被用户的 PDS
 编译日志否决，错误为 `CommandTiming-0057: Nothing matched for 'to_list'`，因此已从
-`pgl50h_board_top.fdc` 删除。当前在 `clock_reset.sv` 增加
-`mes50hp_reset_sync_sync_only`，其视频域 `reset_release` 只在
-`video_pixel_clk` 上更新，并保留 `syn_preserve`；`pgl50h_board_top.sv` 的
+`pg2l200h_board_top.fdc` 删除。当前在 `clock_reset.sv` 增加
+`pg2l200h_reset_sync_sync_only`，其视频域 `reset_release` 只在
+`video_pixel_clk` 上更新，并保留 `syn_preserve`；`pg2l200h_board_top.sv` 的
 `video_reset_sync` 已切换到该模块。随后在 FDC 中加入
 `set_false_path -from [get_clocks {cfg_clk}] -to [get_clocks {video_pixel_clk}]`，并在
 `check_video_reset_recovery_constraints.ps1` 中增加唯一性和 endpoint 审计：当前 PDS 报告中该
 时钟对只有两个复位同步器 endpoint。静态门禁、板级约束一致性检查和
-`tb_pgl50h_board_top_compile` XSim 均已通过。步骤 5 仍需用户运行完整 PDS，确认约束导入无误、
+`tb_pg2l200h_board_top_compile` XSim 均已通过。步骤 5 仍需用户运行完整 PDS，确认约束导入无误、
 `cfg_clk → video_pixel_clk` setup/recovery 不再产生违例，并确认没有普通数据路径被切断。
 
 **验收：** `cfg_clk → video_pixel_clk` recovery WNS ≥ 0，且没有因全局 false path 导致有效路径数量异常减少。
@@ -542,8 +542,8 @@
 
 **文件：**
 
-- 工程：`boards/pgl50h/pds/pgl50h_rtl_synth`
-- 重点报告：`place_route/*timing_summary*`、`report_timing/pgl50h_board_top.rtr`
+- 工程：`boards/pg2l200h/pds/pg2l200h_rtl_synth`
+- 重点报告：`place_route/*timing_summary*`、`report_timing/pg2l200h_board_top.rtr`
 
 - [x] **步骤 1：在 setup 稳定后重新执行 PDS hold fix。**
 
@@ -580,15 +580,15 @@
 
 **文件：**
 
-- 检查：`boards/pgl50h/constraints/pgl50h_board_top.fdc`
-- 检查：`sim/run_720p30_throughput.ps1`
-- 检查：`sim/run_mes50hp_top_cache_image_720p.ps1`
-- 检查：`sim/run_pgl50h_board_top_compile.ps1`
+- 检查：`boards/pg2l200h/constraints/pg2l200h_board_top.fdc`
+- 检查：`sim/run_720p60_throughput.ps1`
+- 检查：`sim/run_distortion_frame_processor_cache_image_720p.ps1`
+- 检查：`sim/run_pg2l200h_board_top_compile.ps1`
 - 生成：完整 PDS 下载文件及最终 timing/resource 报告
 
 - [ ] **步骤 1：运行全部 FIFO、Cache、DDR adapter、压力、整图和吞吐率仿真。**
 
-- [ ] **步骤 2：确认 720p30 一帧周期不超过 2,500,000。**
+- [ ] **步骤 2：确认 720p60 一帧周期不超过 2,500,000。**
 
 - [ ] **步骤 3：确认输入输出像素均为 921,600，图像与 golden 逐像素一致。**
 
@@ -612,7 +612,7 @@
 
 ### 任务 9：修复真实 PLL 相位下的 DDR 复位 recovery 与 Cache 重查路径
 
-**根因：** 37.125 MHz PLL 配置的真实 `cfg_clk` 为 9.9593 MHz（`50 MHz × 49 / 246`），不再与
+**根因：** `cfg_clk` 由独立 `cfg_pll` 生成，其实际频率与相位必须以 PG2L200H IP 重新生成后的 PDS 报告为准，不能再假设它与
 `sys_clk` 整周期对齐。上一版将 `rstn_out` 接入异步断言的 `ddr_reset_sync` 后，正式 PDS 表明
 recovery 端点只是迁移为 `ddr_reset_sync/reset_release[*]/RS`，并未消失；根因是 cfg 域信号仍驱动
 异步 RS 引脚。慢角 setup 的真实主路径也不是仅 refill 重查，而是正常查询
@@ -620,23 +620,23 @@ recovery 端点只是迁移为 `ddr_reset_sync/reset_release[*]/RS`，并未消�
 
 **文件：**
 
-- 修改：`rtl/board/pgl50h/pgl50h_board_top.sv`
-- 修改：`sim/tb_pgl50h_board_top_compile.sv`
+- 修改：`rtl/board/pg2l200h/pg2l200h_board_top.sv`
+- 修改：`sim/tb_pg2l200h_board_top_compile.sv`
 - 修改：`sim/check_video_reset_recovery_constraints.ps1`
 - 修改：`rtl/platform/common/memory/pixel_tile_cache.sv`
 - 修改：`sim/tb_pixel_tile_cache.sv`
-- 验证：`sim/run_pgl50h_board_top_compile.ps1`、`sim/run_pixel_tile_cache.ps1`、
-  `sim/run_720p30_throughput.ps1`、`sim/run_mes50hp_top_cache_image_720p.ps1`
+- 验证：`sim/run_pg2l200h_board_top_compile.ps1`、`sim/run_pixel_tile_cache.ps1`、
+  `sim/run_720p60_throughput.ps1`、`sim/run_distortion_frame_processor_cache_image_720p.ps1`
 
 - [x] **步骤 1：为 DDR 复位写 RED 检查。**
 
   板级编译 testbench 与静态检查必须要求存在 `ddr_reset_sync`，其时钟为 `sys_clk`，输入为
-  `rstn_out`，输出唯一连接到 `DDR3_50H.resetn`；复位释放在 `rstn_out` 后经过两个本地
+  `rstn_out`，输出唯一连接到 `ddr3_test.resetn`；复位释放在 `rstn_out` 后经过两个本地
   `sys_clk` 边沿。旧的直连实现必须使该检查失败。
 
 - [x] **步骤 2：在 sys_clk 域以无 RS 的同步释放 DDR 外部复位。**
 
-  使用 `mes50hp_reset_sync_sync_only` 生成 `ddr_reset_n`，连接到 `DDR3_50H.resetn`。该两级
+  使用 `pg2l200h_reset_sync_sync_only` 生成 `ddr_reset_n`，连接到 `ddr3_test.resetn`。该两级
   `sys_clk` 移位寄存器只使用时钟触发器的 D 输入，不让 `rstn_out` 驱动任何 RS 引脚；不得对
   `cfg_clk → sys_clk` 添加 false path。
 
@@ -684,8 +684,8 @@ recovery 端点只是迁移为 `ddr_reset_sync/reset_release[*]/RS`，并未消�
 
 ```text
 功能仿真通过
-AND 720p30 图像逐像素一致
-AND 720p30 <= 2,500,000 核心周期
+AND 720p60 图像逐像素一致
+AND 720p60 <= 2,500,000 核心周期
 AND 所有时钟 setup WNS >= 0
 AND 所有时钟 hold WHS >= 0
 AND recovery/removal >= 0
@@ -694,4 +694,4 @@ AND 资源与 DRM/APM 映射正常
 AND 下载文件成功生成
 ```
 
-只有满足以上全部条件，才能把“时序优化完成”作为真实完成，并进入 PGL50H 上板联调。
+只有满足以上全部条件，才能把“时序优化完成”作为真实完成，并进入 PG2L200H 上板联调。
