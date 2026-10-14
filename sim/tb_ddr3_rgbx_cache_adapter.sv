@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 // Contract test for the board-side cache/DDR address-unit boundary.
-// The cache owns byte addressing; the MES50HP command controller owns
+// The cache owns byte addressing; the board command controller owns
 // 32-bit-word addressing.  One 32-byte Tile Cache request must therefore
 // become an eight-word controller address without changing its beat count.
 module tb_ddr3_rgbx_cache_adapter;

@@ -2,9 +2,9 @@
 
 // Synchronous 128-bit Tile Cache bank.
 //
-// The public interface is technology-neutral.  PDS resolves
-// pgl50h_tile_cache_bank_ip to the PGL50H DRM wrapper, while XSim supplies a
-// behavioral module with the same name from sim/pgl50h_tile_cache_bank_ip_model.sv.
+// The public interface is technology-neutral.  Each board target supplies a
+// tile_cache_bank_ip implementation, while simulation supplies a behavioral
+// implementation with the same interface.
 module tile_cache_bank_ram #(
     parameter integer BANK_READ_LATENCY = 1,
     parameter integer BANK_ADDR_WIDTH = 11
@@ -28,7 +28,7 @@ module tile_cache_bank_ram #(
     reg [BANK_READ_LATENCY-1:0] rd_valid_pipe;
     integer latency_index;
 
-    pgl50h_tile_cache_bank_ip #(
+    tile_cache_bank_ip #(
         .ADDR_WIDTH(BANK_ADDR_WIDTH)
     ) bank_ip (
         .wr_data(wr_data),

@@ -16,7 +16,7 @@ try {
         (Join-Path $projectRoot 'rtl\platform\common\memory\ddr_burst_reader.sv') `
         (Join-Path $projectRoot 'rtl\platform\common\memory\pixel_tile_cache.sv') `
         (Join-Path $projectRoot 'rtl\platform\common\memory\tile_cache_bank_ram.sv') `
-        (Join-Path $projectRoot 'sim\pgl50h_tile_cache_bank_ip_model.sv') `
+        (Join-Path $projectRoot 'sim\tile_cache_bank_ip_model.sv') `
         (Join-Path $projectRoot 'rtl\platform\common\memory\cached_pixel_fetch_engine.sv') `
         (Join-Path $projectRoot 'rtl\platform\common\control\algorithm_reset_tree.sv') `
         (Join-Path $projectRoot 'rtl\algorithm\distortion\distortion_image_pipeline.sv') `

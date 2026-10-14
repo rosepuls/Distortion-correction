@@ -4,7 +4,7 @@
 
 面向 `distortion_core_optimized` 生成 Q18 位精确黄金结果时，在
 `generate_distortion_vectors.py` 后添加 `--optimized-q18`。完整的
-PGL50H 顶层图片回归可直接运行 `sim/run_mes50hp_top_image.ps1`。
+PG2L200H 算法系统顶层图片回归可直接运行 `sim/run_distortion_frame_processor_image.ps1`。
 
 生成 64×48、每格 8 像素的 RGB 棋盘格：
 
@@ -82,10 +82,10 @@ RTL 与 Python Golden 的放大差分。XSim 临时文件位于
 
 ## 1280×720 RGBX Cache 回归
 
-当前 PGL50H 主路径使用 1280×720@30fps、16 set × 4 way Tile Cache。完整图片回归使用：
+当前 PG2L200H 上板基线使用 1280×720@60fps；Tile Cache 的容量和路数由相应回归脚本参数固定。完整图片回归使用：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File sim/run_mes50hp_top_cache_image_720p.ps1
+powershell -ExecutionPolicy Bypass -File sim/run_distortion_frame_processor_cache_image_720p.ps1
 ```
 
 结果位于 `result/sim_assets/cache_full_chain_1280x720/`，吞吐率回归使用：

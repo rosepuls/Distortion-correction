@@ -8,7 +8,7 @@ Push-Location $runDirectory
 try {
     & xvlog -sv `
         (Join-Path $projectRoot 'rtl\platform\common\memory\tile_cache_bank_ram.sv') `
-        (Join-Path $projectRoot 'sim\pgl50h_tile_cache_bank_ip_model.sv') `
+        (Join-Path $projectRoot 'sim\tile_cache_bank_ip_model.sv') `
         (Join-Path $projectRoot 'sim\tb_tile_cache_bank_ram.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

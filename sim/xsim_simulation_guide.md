@@ -212,8 +212,8 @@ xsim <快照名> -runall
 当前板级主路径为 1280×720@30fps，完整 RGBX Cache 图片回归和吞吐率回归分别运行：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File sim/run_mes50hp_top_cache_image_720p.ps1
+powershell -ExecutionPolicy Bypass -File sim/run_distortion_frame_processor_cache_image_720p.ps1
 powershell -ExecutionPolicy Bypass -File sim/run_720p30_throughput.ps1
 ```
 
-1080p 脚本仍保留为历史基线，不作为当前 PGL50H 默认配置。
+1080p 脚本仍保留为历史基线，不作为当前 PG2L200H 720p60 上板配置。

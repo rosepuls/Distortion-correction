@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $vivadoRoot = 'D:\Xilinx\Vivado\2020.2'
 $runDirectory = Join-Path $projectRoot 'xsim.dir\video_mode_720p60'
-$rtlPath = Join-Path $projectRoot 'rtl\board\pgl50h\video_mode_720p60.sv'
+$rtlPath = Join-Path $projectRoot 'rtl\board\pg2l200h\video_mode_720p60.sv'
 $testbenchPath = Join-Path $projectRoot 'sim\tb_video_mode_720p60.sv'
 New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 

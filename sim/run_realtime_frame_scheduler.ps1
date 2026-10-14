@@ -7,7 +7,7 @@ New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 Push-Location $runDirectory
 try {
     & "$vivadoRoot\bin\xvlog.bat" -sv `
-        (Join-Path $projectRoot 'rtl\board\pgl50h\realtime_frame_scheduler.sv') `
+        (Join-Path $projectRoot 'rtl\board\pg2l200h\realtime_frame_scheduler.sv') `
         (Join-Path $projectRoot 'sim\tb_realtime_frame_scheduler.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

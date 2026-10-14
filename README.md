@@ -1,8 +1,8 @@
 # Distortion-correction
 
-面向紫光同创盘古50 MES50HP（PGL50H-6IFBG484）的实时视频畸变矫正与轻量视觉处理项目。
+面向紫光同创盘古200Pro+（`PG2L200H-6FBB676` / Logos2）的实时视频畸变矫正与轻量视觉处理项目。
 
-当前处于无板卡、无 PDS 阶段，主要使用 Python 建立参考模型，并使用 Vivado Simulator 验证可迁移的 Verilog/SystemVerilog 核心模块。最终板级工程使用 Pango Design Suite（PDS），板卡专用的时钟、HDMI、DDR3、CDC 和引脚约束与算法核心隔离。
+算法、缓存、黄金模型与 XSim 回归保持板卡无关；活动板级工程位于 `rtl/board/pg2l200h/`、`rtl/vendor/pg2l200h/`、`ip/pango/pg2l200h/` 与 `boards/pg2l200h/`。板级实现使用 Pango Design Suite 2022.2-SP6.4，专用时钟、HDMI、DDR3、CDC 和引脚约束与算法核心隔离。
 
 当前工作顺序：
 
@@ -22,15 +22,17 @@ RTL 与自动 Testbench
 
 项目计划：
 
-- [MES50HP 总体项目计划](docs/plans/mes50hp_project_plan.md)
-- [无板卡阶段推进计划](docs/plans/boardless_development_plan.md)
+- [原始项目计划（历史记录）](docs/plans/基于紫光同创盘古50%20MES50HP（PGL50H）的视频畸变矫正与轻量视觉处理系统项目计划.md)
+- [无板卡阶段推进计划（历史记录）](docs/plans/无板卡阶段临时推进计划.md)
 
 仿真操作：
 
-- [Vivado XSim / Codex 仿真 SOP](docs/xsim_codex_sop.md)
+- [PG2L200H 结构编译](sim/run_pg2l200h_board_top_compile.ps1)
+- [PG2L200H 迁移资产检查](sim/check_pg2l200h_migration.ps1)
 
 板卡资料：
 
-- [MES50HP 资源与存储说明](docs/board/mes50hp_resources.md)
-- [MES50HP 时钟与 CDC 规划](docs/board/mes50hp_clock_plan.md)
-- [MES50HP 接口与引脚资料索引](docs/board/mes50hp_pin_map.md)
+- [PG2L200H 资源与存储说明](docs/board/pg2l200h_resources.md)
+- [PG2L200H 时钟与 CDC 规划](docs/board/pg2l200h_clock_plan.md)
+- [PG2L200H 接口与引脚资料索引](docs/board/pg2l200h_pin_map.md)
+- [PG2L200H PDS 交接](docs/board/pg2l200h_pds_handoff.md)

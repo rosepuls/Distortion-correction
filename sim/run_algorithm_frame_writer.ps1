@@ -8,7 +8,7 @@ New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 Push-Location $runDirectory
 try {
     & (Join-Path $vivadoRoot 'bin\xvlog.bat') -sv `
-        (Join-Path $projectRoot 'rtl\board\pgl50h\algorithm_frame_writer.sv') `
+        (Join-Path $projectRoot 'rtl\board\pg2l200h\algorithm_frame_writer.sv') `
         (Join-Path $projectRoot 'sim\tb_algorithm_frame_writer.sv')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

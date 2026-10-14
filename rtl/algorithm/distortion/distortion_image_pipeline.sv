@@ -77,7 +77,7 @@ module distortion_image_pipeline #(
     wire reset_tree_ready;
     // The optimized core contains a wide arithmetic pipeline.  Resetting
     // that data path (or conditionally holding it during reset) creates a
-    // multi-thousand-load reset/clock-enable net that PGL50H cannot route
+    // multi-thousand-load reset/clock-enable net that a board-level router cannot route
     // reliably.  Keep the core clocking, flush its fixed 15-cycle latency
     // with invalid transactions, and do not accept a new frame until then.
     localparam integer CORE_FLUSH_CYCLES = 16;
