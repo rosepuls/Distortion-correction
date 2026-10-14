@@ -132,6 +132,19 @@ module cfg_pll(input wire clkin1, output wire clkout0, output wire lock);
     assign lock = (lock_count == 3'd4);
 endmodule
 
+// Functional model: complete HDMI receiver/transmitter configuration as soon
+// as the board reset is released.  The real I2C transaction timing belongs to
+// PDS/board bring-up rather than a short data-path regression.
+module ms72xx_ctl(
+    input wire clk, input wire rst_n, output wire init_over_rx,
+    output wire init_over, output wire iic_scl, inout wire iic_sda
+);
+    assign init_over_rx = rst_n;
+    assign init_over = rst_n;
+    assign iic_scl = 1'b1;
+    assign iic_sda = 1'bz;
+endmodule
+
 module GTP_INBUFGDS #(
     parameter IOSTANDARD = "DEFAULT",
     parameter TERM_DIFF = "ON"

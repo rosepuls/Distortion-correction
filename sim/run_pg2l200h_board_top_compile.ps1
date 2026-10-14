@@ -5,13 +5,6 @@ $vivadoRoot = 'D:\Xilinx\Vivado\2020.2'
 $runDirectory = Join-Path $projectRoot 'xsim.dir\pg2l200h_board_top_compile'
 New-Item -ItemType Directory -Force -Path $runDirectory | Out-Null
 
-$verilogSources = @(
-    'rtl/vendor/pg2l200h/hdmi/iic_dri.v',
-    'rtl/vendor/pg2l200h/hdmi/ms7200_ctl.v',
-    'rtl/vendor/pg2l200h/hdmi/ms7210_ctl.v',
-    'rtl/vendor/pg2l200h/hdmi/ms72xx_ctl.v'
-) | ForEach-Object { Join-Path $projectRoot $_ }
-
 $sources = @(
     'sim/models/pg2l200h_board_vendor_stubs.sv',
     'rtl/algorithm/distortion/coordinate_gen.sv',
@@ -48,9 +41,6 @@ $sources = @(
 
 Push-Location $runDirectory
 try {
-    & (Join-Path $vivadoRoot 'bin\xvlog.bat') @verilogSources
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
     & (Join-Path $vivadoRoot 'bin\xvlog.bat') -sv @sources
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
