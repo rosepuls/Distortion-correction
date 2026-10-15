@@ -43,6 +43,10 @@ module wr_rd_ctrl_top #(
     reg [MEM_DQ_WIDTH*8-1:0] read_data_reg;
     integer lane;
     integer mem_index;
+    integer unknown_write_words = 0;
+    integer unknown_read_words = 0;
+    integer first_unknown_write_addr = -1;
+    integer first_unknown_read_addr = -1;
 
     function integer address_index(input [CTRL_ADDR_WIDTH-1:0] word_addr);
         reg [1:0] region;
@@ -98,6 +102,11 @@ module wr_rd_ctrl_top #(
                 if (wr_data_re) begin
                     for (lane = 0; lane < 8; lane = lane + 1) begin
                         mem_index = address_index(active_addr) + lane;
+                        if ($isunknown(wr_ctrl_data[lane*32 +: 32])) begin
+                            unknown_write_words = unknown_write_words + 1;
+                            if (first_unknown_write_addr < 0)
+                                first_unknown_write_addr = active_addr + lane;
+                        end
                         if ((mem_index >= 0) && (mem_index < MEM_WORDS))
                             memory[mem_index] <= wr_ctrl_data[lane*32 +: 32];
                     end
@@ -112,9 +121,14 @@ module wr_rd_ctrl_top #(
             end else if ((state == READ) && read_ready && (stall_phase[1:0] != 2'b00)) begin
                 for (lane = 0; lane < 8; lane = lane + 1) begin
                     mem_index = address_index(active_addr) + lane;
-                    if ((mem_index >= 0) && (mem_index < MEM_WORDS))
+                    if ((mem_index >= 0) && (mem_index < MEM_WORDS)) begin
+                        if ($isunknown(memory[mem_index])) begin
+                            unknown_read_words = unknown_read_words + 1;
+                            if (first_unknown_read_addr < 0)
+                                first_unknown_read_addr = active_addr + lane;
+                        end
                         read_data_reg[lane*32 +: 32] <= memory[mem_index];
-                    else
+                    end else
                         read_data_reg[lane*32 +: 32] <= 32'd0;
                 end
                 active_addr <= active_addr + 8;

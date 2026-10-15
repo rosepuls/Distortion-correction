@@ -29,6 +29,8 @@ module tb_pg2l200h_board_video_small;
 
     integer frame_starts = 0;
     integer output_completes = 0;
+    integer algorithm_pixels = 0;
+    integer algorithm_unknown_pixels = 0;
     integer cycles = 0;
     integer errors = 0;
 
@@ -70,6 +72,10 @@ module tb_pg2l200h_board_video_small;
     always @(posedge dut.core_clk) begin
         if (dut.algo_frame_start)
             frame_starts = frame_starts + 1;
+        if (dut.algo_out_valid && $isunknown(dut.algo_out_pixel))
+            algorithm_unknown_pixels = algorithm_unknown_pixels + 1;
+        if (dut.algo_out_valid)
+            algorithm_pixels = algorithm_pixels + 1;
         if (dut.output_frame_complete)
             output_completes = output_completes + 1;
     end
@@ -124,6 +130,13 @@ module tb_pg2l200h_board_video_small;
         end
         if (output_completes == 0)
             $fatal(1, "TEST_FAIL: output frame did not complete through DDR data path");
+        $display("TEST_SCOPE: control-only; WIDTH=32 is below wr_buf's 20-pixel prefetch margin; pixel X is diagnostic, not a data-integrity verdict");
+        $display("XDIAG algo_pixels=%0d algo_unknown=%0d ddr_unknown_reads=%0d first_read_addr=%0d ddr_unknown_writes=%0d first_write_addr=%0d", algorithm_pixels, algorithm_unknown_pixels, dut.memory_command_controller.unknown_read_words, dut.memory_command_controller.first_unknown_read_addr, dut.memory_command_controller.unknown_write_words, dut.memory_command_controller.first_unknown_write_addr);
+        // This tiny-frame integration test checks control/frame completion.
+        // Its DDR model intentionally leaves untouched frame-buffer regions
+        // unknown, and the vendor wr_buf's fixed 20-pixel prefetch is not
+        // representative at IMAGE_WIDTH=32. Pixel integrity is covered by
+        // the dedicated 1280-pixel wr_buf capture test.
         if (dut.output_writer_overflow || dut.display_underflow)
             $fatal(1, "TEST_FAIL: board video path reported overflow or underflow");
 

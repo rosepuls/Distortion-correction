@@ -176,8 +176,9 @@ endmodule
 `endif
 
 // Behavioral stand-in for the generated Pango 32-bit-write / 256-bit-read
-// line-buffer IP.  Board structural tests use this only when the RGBX writer
-// selects its hardware branch; PDS imports the generated wr_fram_buf IP.
+// line-buffer IP. Tests that compile the generated PDS IP define
+// USE_VENDOR_WR_FRAM_BUF and use the vendor wrapper plus primitive model.
+`ifndef USE_VENDOR_WR_FRAM_BUF
 module wr_fram_buf (
     input wire [31:0] wr_data,
     input wire [11:0] wr_addr,
@@ -204,6 +205,7 @@ module wr_fram_buf (
         end
     end
 endmodule
+`endif
 
 `ifndef FUNCTIONAL_DDR_CTRL
 module wr_rd_ctrl_top #(
