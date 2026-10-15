@@ -46,6 +46,8 @@ module tb_distortion_frame_processor_cache_image;
 `endif
 `ifdef CACHE_WAYS_2
     localparam integer TILE_CACHE_WAY_COUNT = 2;
+`elsif CACHE_WAYS_4
+    localparam integer TILE_CACHE_WAY_COUNT = 4;
 `elsif CACHE_IMAGE_720P
     localparam integer TILE_CACHE_WAY_COUNT = 4;
 `else

@@ -156,6 +156,7 @@ module GTP_INBUFGDS #(
     assign O = I;
 endmodule
 
+`ifndef USE_VENDOR_WR_BUF
 module wr_buf #(
     parameter ADDR_WIDTH=28, ADDR_OFFSET=0, H_NUM=1280, V_NUM=720,
     parameter DQ_WIDTH=32, LEN_WIDTH=32, PIX_WIDTH=24,
@@ -172,6 +173,7 @@ module wr_buf #(
     assign ddr_wreq=1'b0; assign ddr_waddr='0; assign ddr_wr_len='0;
     assign ddr_wdata='0; assign frame_wcnt='0; assign frame_wirq=1'b0;
 endmodule
+`endif
 
 // Behavioral stand-in for the generated Pango 32-bit-write / 256-bit-read
 // line-buffer IP.  Board structural tests use this only when the RGBX writer
@@ -203,6 +205,7 @@ module wr_fram_buf (
     end
 endmodule
 
+`ifndef FUNCTIONAL_DDR_CTRL
 module wr_rd_ctrl_top #(
     parameter CTRL_ADDR_WIDTH=28, parameter MEM_DQ_WIDTH=32
 ) (
@@ -239,3 +242,4 @@ module wr_rd_ctrl_top #(
     assign axi_arlen='0; assign axi_arsize='0; assign axi_arburst='0;
     assign axi_arvalid=1'b0; assign axi_rready=read_ready;
 endmodule
+`endif

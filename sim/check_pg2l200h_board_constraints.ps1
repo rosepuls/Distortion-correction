@@ -34,4 +34,17 @@ if ($fdcText -match 'PGL50H|MES50HP|DDR3_50H') {
     throw 'PG2L200H FDC contains a legacy-board dependency.'
 }
 
+if ($fdcText -match 'u_ddr3_test_h') {
+    throw 'PG2L200H FDC still references the obsolete DDR wrapper instance u_ddr3_test_h.'
+}
+foreach ($requiredDdrPath in @(
+    'ddr3_controller.u_ddrphy_top.rst_clk_gpll/clkout0',
+    'ddr3_controller.u_ddrphy_top.ddrphy_gpll/clkout0',
+    'ddr3_controller.u_ddrphy_top.u_ddrphy_cpd'
+)) {
+    if ($fdcText -notmatch [regex]::Escape($requiredDdrPath)) {
+        throw "FDC does not constrain the current DDR3 instance hierarchy: $requiredDdrPath"
+    }
+}
+
 Write-Host 'PASS: PG2L200H board top, Logos2 clocks, and official FDC baseline are consistent.'

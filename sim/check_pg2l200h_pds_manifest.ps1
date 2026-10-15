@@ -20,8 +20,6 @@ $requiredReferences = @(
     'source/rtl/board/pg2l200h/pg2l200h_board_top.sv',
     'source/rtl/vendor/pg2l200h/hdmi/ms72xx_ctl.v',
     'source/rtl/vendor/pg2l200h/ddr/wr_rd_ctrl_top.v',
-    'source/rtl/vendor/pg2l200h/ddr/wr_fram_buf/wr_fram_buf.idf',
-    'source/rtl/vendor/pg2l200h/ddr/rd_fram_buf/rd_fram_buf.idf',
     'source/ip/pango/pg2l200h/ddr3/ddr3_test.idf',
     'source/ip/pango/pg2l200h/video_pll/pll.idf',
     'source/ip/pango/pg2l200h/cfg_pll/cfg_pll.idf',
@@ -35,6 +33,15 @@ foreach ($requiredReference in $requiredReferences) {
     $windowsReference = $requiredReference.Replace('/', '\')
     if (-not (Test-Path -LiteralPath (Join-Path $pdsRoot $windowsReference))) {
         throw "PDS reference does not exist: $requiredReference"
+    }
+}
+
+foreach ($obsoleteReference in @(
+    'source/rtl/vendor/pg2l200h/ddr/wr_fram_buf/wr_fram_buf.idf',
+    'source/rtl/vendor/pg2l200h/ddr/rd_fram_buf/rd_fram_buf.idf'
+)) {
+    if ($pdsText.Contains($obsoleteReference)) {
+        throw "PDS still imports an incompatible PG2L100H IP: $obsoleteReference"
     }
 }
 

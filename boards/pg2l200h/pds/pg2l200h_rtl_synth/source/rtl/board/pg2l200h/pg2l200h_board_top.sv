@@ -206,8 +206,10 @@ module pg2l200h_board_top #(
 
     // The first VS arms the stream; every following VS completes one input
     // frame.  A toggle safely carries each completion into the DDR domain.
-    reg capture_pix_1;
-    reg capture_pix_2;
+    // pipeline_ready is a start-up level crossing from the configuration/DDR
+    // domains. Preserve the two destination-clock flops as a CDC boundary.
+    reg capture_pix_1 /* synthesis syn_preserve = 1 */;
+    reg capture_pix_2 /* synthesis syn_preserve = 1 */;
     reg vs_in_d;
     reg capture_frame_seen;
     reg capture_complete_toggle;
@@ -426,8 +428,10 @@ module pg2l200h_board_top #(
     wire display_pixel_valid;
     wire [23:0] display_pixel;
     wire display_underflow;
-    reg display_pix_1;
-    reg display_pix_2;
+    // display_enable includes the configuration-domain HDMI-init level.
+    // These two video-clock flops are its CDC boundary.
+    reg display_pix_1 /* synthesis syn_preserve = 1 */;
+    reg display_pix_2 /* synthesis syn_preserve = 1 */;
     always @(posedge video_pixel_clk or negedge video_rst_n) begin
         if (!video_rst_n) begin
             display_pix_1 <= 1'b0;

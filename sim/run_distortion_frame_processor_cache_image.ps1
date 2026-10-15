@@ -46,7 +46,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Push-Location $runDirectory
 try {
-    & xvlog -sv `
+    & xvlog -sv -d CACHE_WAYS_4 `
         (Join-Path $projectRoot "rtl\algorithm\distortion\coordinate_gen.sv") `
         (Join-Path $projectRoot "rtl\algorithm\distortion\normalize.sv") `
         (Join-Path $projectRoot "rtl\algorithm\distortion\coordinate_split.sv") `

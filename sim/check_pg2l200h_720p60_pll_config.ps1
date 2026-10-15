@@ -21,6 +21,18 @@ function Require-Match {
     }
 }
 
+function Require-NoMatch {
+    param(
+        [string]$Text,
+        [string]$Pattern,
+        [string]$Name
+    )
+
+    if ($Text -match $Pattern) {
+        throw "FAIL: $Name"
+    }
+}
+
 $idfText = Get-Content $idf -Raw
 $pllText = Get-Content $pll -Raw
 $fdcText = Get-Content $fdc -Raw
@@ -31,5 +43,8 @@ Require-Match $pllText 'STATIC_RATIO0\s*=\s*14\.0' 'generated PLL output divider
 Require-Match $pllText 'STATIC_DUTY0\s*=\s*14' 'generated PLL clkout0 duty divider is not 14'
 Require-Match $fdcText 'create_clock\s+-name\s+\{sys_clk\}.*-period\s+\{37\.000\}' 'sys_clk must remain constrained as 27 MHz input'
 Require-Match $fdcText 'create_clock\s+-name\s+\{pixclk_in\}.*-period\s+\{13\.468\}' 'pixclk_in must be constrained as 74.25 MHz 720p60 input'
+Require-Match $fdcText 'create_generated_clock\s+-name\s+\{video_pixel_clk\}\s+-source\s+\[get_ports\s+\{sys_clk\}\]\s+\[get_nets\s+\{video_pll/clkout0\}\]\s+-master_clock\s+\[get_clocks\s+\{sys_clk\}\]\s+-multiply_by\s+\{11\}\s+-divide_by\s+\{4\}' 'video PLL output must be constrained as 74.25 MHz'
+Require-Match $fdcText 'create_generated_clock\s+-name\s+\{cfg_clk\}\s+-source\s+\[get_ports\s+\{sys_clk\}\]\s+\[get_nets\s+\{hdmi_cfg_pll/clkout0\}\]\s+-master_clock\s+\[get_clocks\s+\{sys_clk\}\]\s+-multiply_by\s+\{10\}\s+-divide_by\s+\{27\}' 'HDMI configuration PLL output must be constrained as 10 MHz'
+Require-NoMatch $fdcText 'set_clock_groups\s+-name\s+clk_25M' 'stale clk_25M clock-group constraint remains'
 
 Write-Output 'PASS: 720p60 PLL configuration is internally consistent'

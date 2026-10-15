@@ -48,7 +48,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Push-Location $runDirectory
 try {
     $cacheSetDefine = "TILE_CACHE_SETS_$CacheSets"
-    & xvlog -sv -d FULL_HD_CACHE_IMAGE -d $cacheSetDefine `
+    & xvlog -sv -d FULL_HD_CACHE_IMAGE -d CACHE_WAYS_4 -d $cacheSetDefine `
         (Join-Path $projectRoot "rtl\algorithm\distortion\coordinate_gen.sv") `
         (Join-Path $projectRoot "rtl\algorithm\distortion\normalize.sv") `
         (Join-Path $projectRoot "rtl\algorithm\distortion\coordinate_split.sv") `

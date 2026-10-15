@@ -7,6 +7,16 @@
 module pg2l200h_board_top #(
     parameter integer IMAGE_WIDTH = 1280,
     parameter integer IMAGE_HEIGHT = 720,
+    parameter integer VIDEO_H_TOTAL = 1650,
+    parameter integer VIDEO_H_SYNC = 40,
+    parameter integer VIDEO_H_BACK = 220,
+    parameter integer VIDEO_H_ACTIVE = 1280,
+    parameter integer VIDEO_H_FRONT = 110,
+    parameter integer VIDEO_V_TOTAL = 750,
+    parameter integer VIDEO_V_SYNC = 5,
+    parameter integer VIDEO_V_BACK = 20,
+    parameter integer VIDEO_V_ACTIVE = 720,
+    parameter integer VIDEO_V_FRONT = 5,
     parameter integer COORD_WIDTH = 12,
     parameter integer MEM_ROW_ADDR_WIDTH = 15,
     parameter integer MEM_COL_ADDR_WIDTH = 10,
@@ -206,8 +216,10 @@ module pg2l200h_board_top #(
 
     // The first VS arms the stream; every following VS completes one input
     // frame.  A toggle safely carries each completion into the DDR domain.
-    reg capture_pix_1;
-    reg capture_pix_2;
+    // pipeline_ready is a start-up level crossing from the configuration/DDR
+    // domains. Preserve the two destination-clock flops as a CDC boundary.
+    reg capture_pix_1 /* synthesis syn_preserve = 1 */;
+    reg capture_pix_2 /* synthesis syn_preserve = 1 */;
     reg vs_in_d;
     reg capture_frame_seen;
     reg capture_complete_toggle;
@@ -426,8 +438,10 @@ module pg2l200h_board_top #(
     wire display_pixel_valid;
     wire [23:0] display_pixel;
     wire display_underflow;
-    reg display_pix_1;
-    reg display_pix_2;
+    // display_enable includes the configuration-domain HDMI-init level.
+    // These two video-clock flops are its CDC boundary.
+    reg display_pix_1 /* synthesis syn_preserve = 1 */;
+    reg display_pix_2 /* synthesis syn_preserve = 1 */;
     always @(posedge video_pixel_clk or negedge video_rst_n) begin
         if (!video_rst_n) begin
             display_pix_1 <= 1'b0;
@@ -438,7 +452,13 @@ module pg2l200h_board_top #(
         end
     end
 
-    video_mode_720p60 output_timing (
+    video_mode_720p60 #(
+        .H_TOTAL(VIDEO_H_TOTAL), .H_SYNC(VIDEO_H_SYNC),
+        .H_BACK(VIDEO_H_BACK), .H_ACTIVE(VIDEO_H_ACTIVE),
+        .H_FRONT(VIDEO_H_FRONT), .V_TOTAL(VIDEO_V_TOTAL),
+        .V_SYNC(VIDEO_V_SYNC), .V_BACK(VIDEO_V_BACK),
+        .V_ACTIVE(VIDEO_V_ACTIVE), .V_FRONT(VIDEO_V_FRONT)
+    ) output_timing (
         .clk(video_pixel_clk), .rst_n(display_pix_2),
         .vs(timing_vs), .hs(timing_hs), .de(timing_de),
         .de_request(timing_de_request),
