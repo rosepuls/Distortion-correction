@@ -5,7 +5,10 @@
 /fpga/project/stage2_ddr3_720p60_shared_clock/
 /fpga/project/stage2_ddr3_720p60_last_line/
 /fpga/project/stage2_ddr3_720p60_frame_slots/
-/fpga/project/stage2_ddr3_720p60_rgbx8888/
+# The RGBX8888 project source and PDS metadata are versioned. Its generated
+# implementation directories remain excluded by the rules below.
+/fpga/project/stage2_ddr3_720p60_rgbx8888/*.log
+/fpga/project/stage2_ddr3_720p60_rgbx8888/*.csv
 
 # Simulation, generated reports, and local Python state.
 .worktrees/
@@ -15,7 +18,11 @@
 **/place_route/
 **/report_timing/
 **/generate_bitstream/
+**/generate_netlist/
 **/constraint_check/
+**/report_power/
+**/log/
+**/logbackup/
 **/__pycache__/
 *.pyc
 *.vcd
