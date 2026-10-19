@@ -37,4 +37,4 @@
 
 后续开发以当前显示正常的 RGBX8888 位流为基线，先完成工业相机棋盘格采集，再运行 `host/calibration/calibrate.py` 和 `host/reference/render_reference.py`。用户尚未拍摄标定照片，因此目前没有真实内参或畸变参数结果。
 
-详见[实施计划](../plan/2026-10-19-720p60-distortion-correction.md)和[阶段 2 详细记录](../results/stage2-ddr3-baseline.md)。本地 PDS 工程及位流被 Git 忽略，换机器时需用脚本和本地厂商资料重新生成。
+详见[实施计划](../plan/2026-10-19-720p60-distortion-correction.md)和[阶段 2 详细记录](../results/stage2-ddr3-baseline.md)。RGBX8888 的 PDS 工程、RTL、IP 源码和构建脚本已纳入 Git；生成目录和位流仍被忽略，换机器后可直接打开已提交工程重新构建。

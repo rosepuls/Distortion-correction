@@ -53,7 +53,7 @@ powershell -NoProfile -File .\fpga\project\New-Stage2Project.ps1
 
 恢复版画面底边的黑色缺口对应 `rd_buf` 少预取第 720 行。`fpga/project/New-Stage2LastLineProject.ps1` 生成只修正该计数条件的独立工程，位流位于 `fpga/project/stage2_ddr3_720p60_last_line/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit`；用户上板连续运行至少 30 分钟，未复现黑边或错位。调试压缩记录见 `docs/chat/2026-10-19-720p60-ddr3-debug-summary.md`。
 
-在此已验证版本基础上，`New-Stage2FrameSlotProject.ps1` 生成 RGB565 三帧槽交接和错误计数工程，`New-Stage2RgbxProject.ps1` 生成 RGBX8888 三帧槽工程。两版均已由 PDS 生成位流；用户反馈 RGB565 三槽版快速闪屏，RGBX8888 三槽版目前显示正常。具体观察和 LED4–7 含义见 `docs/results/stage2-frame-handoff-rgbx.md`；已完成 30 分钟稳定性验证的回退位流仍是末行修正版。
+在此已验证版本基础上，`New-Stage2FrameSlotProject.ps1` 生成 RGB565 三帧槽交接和错误计数工程，`New-Stage2RgbxProject.ps1` 生成 RGBX8888 三帧槽工程。RGBX8888 的 PDS 工程、RTL、IP 源码和构建脚本已提交到 `fpga/project/stage2_ddr3_720p60_rgbx8888/`；克隆后可直接打开该工程重新生成位流。两个版本均已由 PDS 生成位流；用户反馈 RGB565 三槽版快速闪屏，RGBX8888 三槽版目前显示正常。具体观察和 LED4–7 含义见 `docs/results/stage2-frame-handoff-rgbx.md`；已完成 30 分钟稳定性验证的回退位流仍是末行修正版。
 
 ## 阶段 3：相机标定准备
 

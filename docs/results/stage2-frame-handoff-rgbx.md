@@ -11,7 +11,7 @@ powershell -NoProfile -File .\fpga\project\New-Stage2FrameSlotProject.ps1
 powershell -NoProfile -File .\fpga\project\New-Stage2RgbxProject.ps1
 ```
 
-两个脚本从本地厂商例程重新生成独立 PDS 工程，均保留 720p60 EDID、74.25 MHz 输出 PLL 与第 720 行预取修正。RGB565 三槽工程位于 `fpga/project/stage2_ddr3_720p60_frame_slots/`；RGBX8888 工程位于 `fpga/project/stage2_ddr3_720p60_rgbx8888/`。工程目录与位流在 `.gitignore` 中，生成脚本不会覆盖已有目录。
+两个脚本从本地厂商例程重新生成独立 PDS 工程，均保留 720p60 EDID、74.25 MHz 输出 PLL 与第 720 行预取修正。RGB565 三槽工程位于 `fpga/project/stage2_ddr3_720p60_frame_slots/`；RGBX8888 工程的 PDS、RTL、IP 源码和构建脚本已提交到 `fpga/project/stage2_ddr3_720p60_rgbx8888/`。克隆仓库后可直接打开 RGBX8888 PDS 工程构建；生成目录和位流仍由 `.gitignore` 排除。生成脚本不会覆盖已有目录。
 
 | 版本 | 像素布局 | 每行 DDR 32 位字数 | 每帧字数 | 槽跨度 |
 | --- | --- | ---: | ---: | ---: |
