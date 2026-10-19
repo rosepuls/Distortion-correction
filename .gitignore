@@ -8,6 +8,7 @@
 /fpga/project/stage2_ddr3_720p60_rgbx8888/
 
 # Simulation, generated reports, and local Python state.
+.worktrees/
 **/compile/
 **/synthesize/
 **/device_map/
