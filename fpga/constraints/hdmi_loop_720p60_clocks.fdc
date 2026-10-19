@@ -1,0 +1,8 @@
+# The board reference uses 27 MHz sys_clk and forwards the 720p60 input
+# pixel clock. 74.25 MHz has a period of approximately 13.468 ns.
+create_clock -name {sys_clk} [get_ports {sys_clk}] -period {37.037} -waveform {0.000 18.519}
+create_clock -name {pixclk_in} [get_ports {pixclk_in}] -period {13.468} -waveform {0.000 6.734}
+# cfg_pll is generated from sys_clk; HDMI receiver pixel clock is external.
+# tx_init_done enters the pixel domain only through the two-stage synchronizer.
+create_generated_clock -name {cfg_clk} -source [get_ports {sys_clk}] [get_pins {u_cfg_pll/clkout0}] -master_clock [get_clocks {sys_clk}] -multiply_by {10} -divide_by {27}
+set_clock_groups -asynchronous -group [get_clocks {cfg_clk}] -group [get_clocks {pixclk_in}]

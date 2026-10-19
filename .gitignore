@@ -1,0 +1,25 @@
+# PDS working projects generated from the local vendor package.
+/fpga/project/stage1_hdmi_loop/
+/fpga/project/stage2_ddr3_720p60/
+/fpga/project/stage2_ddr3_720p60_baseline_restore/
+/fpga/project/stage2_ddr3_720p60_shared_clock/
+/fpga/project/stage2_ddr3_720p60_last_line/
+/fpga/project/stage2_ddr3_720p60_frame_slots/
+/fpga/project/stage2_ddr3_720p60_rgbx8888/
+
+# Simulation, generated reports, and local Python state.
+**/compile/
+**/synthesize/
+**/device_map/
+**/place_route/
+**/report_timing/
+**/generate_bitstream/
+**/constraint_check/
+**/__pycache__/
+*.pyc
+*.vcd
+*.fst
+/.venv/
+/host/calibration/images/
+/host/calibration/output/
+/host/reference/output/
