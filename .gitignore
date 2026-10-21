@@ -9,6 +9,16 @@
 # implementation directories remain excluded by the rules below.
 /fpga/project/stage2_ddr3_720p60_rgbx8888/*.log
 /fpga/project/stage2_ddr3_720p60_rgbx8888/*.csv
+/fpga/project/stage3_frame_pool_test/*.log
+/fpga/project/stage3_frame_pool_test/*.csv
+/fpga/project/stage3_dual_pool_copy/*.log
+/fpga/project/stage3_dual_pool_copy/*.csv
+/fpga/project/stage3_dual_pool_copy_black_diag/*.log
+/fpga/project/stage3_dual_pool_copy_black_diag/*.csv
+/fpga/project/stage3_dual_pool_copy_cdc_fix/*.log
+/fpga/project/stage3_dual_pool_copy_cdc_fix/*.csv
+/fpga/project/stage3_dual_pool_copy_regen_check/
+/fpga/project/stage3_dual_pool_copy_regen_full_check/
 
 # Simulation, generated reports, and local Python state.
 .worktrees/
@@ -27,6 +37,10 @@
 *.pyc
 *.vcd
 *.fst
+*.vvp
+/fpga/sim/.work/
+/xsim.dir/
+/xvlog.pb
 /.venv/
 /host/calibration/images/
 /host/calibration/output/
