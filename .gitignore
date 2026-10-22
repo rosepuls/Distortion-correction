@@ -19,6 +19,9 @@
 /fpga/project/stage3_dual_pool_copy_cdc_fix/*.csv
 /fpga/project/stage3_dual_pool_copy_regen_check/
 /fpga/project/stage3_dual_pool_copy_regen_full_check/
+# PDS run logs and seed summaries are generated artifacts at project root.
+/fpga/project/*/*.log
+/fpga/project/*/*.csv
 
 # Simulation, generated reports, and local Python state.
 .worktrees/
@@ -33,6 +36,7 @@
 **/report_power/
 **/log/
 **/logbackup/
+**/generate.log
 **/__pycache__/
 *.pyc
 *.vcd

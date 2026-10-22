@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151c">
+  <title>RGBX8888 视频链路检查</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10151c;
+      --panel: #171e27;
+      --panel-raised: #202a35;
+      --line: #34404d;
+      --text: #edf2f7;
+      --muted: #9aa8b7;
+      --accent: #70e0c0;
+      --warning: #ffca72;
+      --danger: #ff7777;
+      --mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      --sans: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-width: 320px; min-height: 100%; margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 var(--sans);
+    }
+    button { font: inherit; }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+      padding: 20px clamp(14px, 2vw, 30px) 14px;
+    }
+    .topbar, .bottom-note, .panel, .stage-wrap {
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 66px;
+      padding: 12px 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      overflow: hidden;
+      border: 1px solid #52606e;
+    }
+    .brand-mark i:nth-child(1) { background: #f34c56; }
+    .brand-mark i:nth-child(2) { background: #56c978; }
+    .brand-mark i:nth-child(3) { background: #5089ff; }
+    .eyebrow, .small-label, .tag, .pattern-index { font: 11px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .eyebrow { color: var(--accent); margin-bottom: 4px; }
+    h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: .01em; }
+    .top-meta { display: flex; gap: 20px; align-items: center; color: var(--muted); }
+    .tag { padding: 7px 9px; border: 1px solid #405249; color: var(--accent); background: #14221f; }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(290px, 350px);
+      gap: 18px;
+    }
+    .stage-wrap {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      padding: 12px;
+    }
+    .stage {
+      min-height: 240px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: #080b0f;
+      border: 1px solid #26313c;
+    }
+    canvas {
+      display: block;
+      width: min(100%, 1280px);
+      height: 100%;
+      max-height: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+      image-rendering: pixelated;
+      background: #000;
+    }
+    .stage-caption {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 3px 0;
+      color: var(--muted);
+      font: 11px/1.4 var(--mono);
+    }
+    .stage-caption strong { color: var(--text); font-weight: 500; }
+    .panel {
+      min-height: 0;
+      overflow: auto;
+      padding: 16px;
+    }
+    .section + .section { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
+    .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 11px; }
+    .section h2 { margin: 0; font-size: 13px; font-weight: 650; }
+    .small-label { color: var(--muted); font-size: 10px; }
+    .pattern-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+    .pattern-button, .action-button, .event-button, .export-button {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      color: var(--text);
+      background: var(--panel-raised);
+      cursor: pointer;
+      transition: border-color .12s ease, background .12s ease, color .12s ease;
+    }
+    .pattern-button { display: flex; align-items: center; gap: 9px; padding: 7px 9px; text-align: left; }
+    .pattern-button:hover, .action-button:hover, .export-button:hover { border-color: #718292; }
+    .pattern-button[aria-pressed="true"] { border-color: var(--accent); background: #1b302d; color: #caffef; }
+    .swatch { width: 20px; height: 20px; flex: 0 0 20px; border: 1px solid #63707d; }
+    .swatch.red { background: #ff0000; }
+    .swatch.green { background: #00ff00; }
+    .swatch.blue { background: #0000ff; }
+    .swatch.white { background: #ffffff; }
+    .swatch.black { background: #000000; }
+    .swatch.stripes { background: repeating-linear-gradient(90deg,#f00 0 4px,#0f0 4px 8px,#00f 8px 12px); }
+    .swatch.checker { background: conic-gradient(#fff 25%,#111 0 50%,#fff 0 75%,#111 0); background-size: 12px 12px; }
+    .swatch.motion { background: linear-gradient(135deg,#111 42%,#70e0c0 43% 57%,#111 58%); }
+    .pattern-name { font-size: 12px; }
+    .pattern-index { margin-left: auto; color: var(--muted); font-size: 9px; }
+
+    .timer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .timer-value { color: var(--accent); font: 26px/1 var(--mono); font-variant-numeric: tabular-nums; }
+    .timer-state { color: var(--muted); font-size: 11px; text-align: right; }
+    .progress { height: 4px; margin: 12px 0; overflow: hidden; background: #303b47; }
+    .progress > span { display: block; width: 0; height: 100%; background: var(--accent); transition: width .2s linear; }
+    .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .action-button { min-height: 36px; padding: 7px 10px; font-size: 12px; }
+    .action-button.primary { border-color: #438d7b; background: #1b3933; color: #caffef; }
+    .action-button.automated { grid-column: 1 / -1; min-height: 42px; border-color: var(--accent); background: #1b3933; color: #caffef; font-weight: 650; }
+    .action-button.subtle { color: var(--muted); }
+    .automation-note { margin: 9px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+    .telemetry-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
+    .telemetry-card { padding: 8px; border: 1px solid var(--line); background: #121820; }
+    .telemetry-card span { display: block; color: var(--muted); font-size: 10px; }
+    .telemetry-card strong { display: block; margin-top: 3px; color: var(--accent); font: 16px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+    .event-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .event-button { min-height: 58px; display: grid; place-items: center; gap: 3px; padding: 6px 4px; text-align: center; }
+    .event-button:hover { border-color: var(--warning); }
+    .event-button strong { font: 18px/1 var(--mono); color: var(--warning); }
+    .event-button span { color: var(--muted); font-size: 10px; }
+    .event-list { max-height: 138px; margin: 10px 0 0; padding: 0; overflow: auto; list-style: none; }
+    .event-list li { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 6px 0; border-top: 1px solid #2b3540; color: var(--muted); font-size: 11px; }
+    .event-list li strong { color: var(--text); font-weight: 500; }
+    .event-list time { font: 10px var(--mono); }
+    .empty-events { padding: 8px 0; color: #718091; font-size: 11px; }
+    .export-button { width: 100%; min-height: 36px; margin-top: 9px; color: var(--accent); font-size: 12px; }
+    .session-start { margin-top: 9px; color: var(--muted); font: 10px/1.4 var(--mono); }
+    .led-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+    .led-field { color: var(--muted); font-size: 10px; }
+    .led-field select { width: 100%; min-height: 32px; margin-top: 3px; border: 1px solid var(--line); color: var(--text); background: var(--panel-raised); font: 11px var(--sans); }
+    .bottom-note { padding: 9px 13px; color: var(--muted); font-size: 11px; }
+    .bottom-note strong { color: var(--warning); font-weight: 600; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    body.clean-view { overflow: hidden; background: #000; }
+    body.clean-view .app { display: block; width: 100vw; height: 100vh; min-height: 0; padding: 0; }
+    body.clean-view .topbar, body.clean-view .panel, body.clean-view .stage-caption, body.clean-view .bottom-note { display: none; }
+    body.clean-view .workspace, body.clean-view .stage-wrap, body.clean-view .stage { display: grid; width: 100%; height: 100%; min-height: 0; grid-template: 1fr / 1fr; gap: 0; padding: 0; border: 0; }
+    body.clean-view canvas { width: 100vw; height: 100vh; max-height: 100vh; object-fit: contain; }
+
+    @media (max-width: 900px) {
+      .app { gap: 10px; padding: 10px; }
+      .workspace { grid-template-columns: 1fr; grid-template-rows: minmax(280px, 1fr) auto; }
+      .panel { max-height: 42vh; }
+      .top-meta .tag { display: none; }
+    }
+    @media (max-width: 520px) {
+      .topbar { min-height: 56px; padding: 9px 11px; }
+      h1 { font-size: 15px; }
+      .top-meta { font-size: 11px; }
+      .pattern-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .workspace { grid-template-rows: minmax(190px, 1fr) auto; }
+      .panel { max-height: 54vh; padding: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <div>
+          <div class="eyebrow">PG2L200H · VIDEO LINK CHECK</div>
+          <h1>RGBX8888 链路检查</h1>
+        </div>
+      </div>
+      <div class="top-meta">
+        <span>目标画布 <strong>1280 × 720</strong></span>
+        <span class="tag">离线单文件</span>
+        <button class="action-button" id="fullscreenButton" type="button">全屏测试 <kbd>F</kbd></button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <section class="stage-wrap" aria-label="测试图显示区">
+        <div class="stage">
+          <canvas id="patternCanvas" width="1280" height="720" aria-label="1280乘720视频测试图"></canvas>
+        </div>
+        <div class="stage-caption">
+          <span>当前图案：<strong id="currentPatternName">红色纯色</strong></span>
+          <span>像素画布 1280 × 720 · <span id="canvasScale">适配显示</span></span>
+        </div>
+      </section>
+
+      <aside class="panel" aria-label="测试控制面板">
+        <section class="section">
+          <div class="section-head"><h2>测试图案</h2><span class="small-label">PATTERN SELECT</span></div>
+          <div class="pattern-grid" id="patternGrid">
+            <button class="pattern-button" data-pattern="red" aria-pressed="true" type="button"><i class="swatch red"></i><span class="pattern-name">红色</span><span class="pattern-index">R</span></button>
+            <button class="pattern-button" data-pattern="green" aria-pressed="false" type="button"><i class="swatch green"></i><span class="pattern-name">绿色</span><span class="pattern-index">G</span></button>
+            <button class="pattern-button" data-pattern="blue" aria-pressed="false" type="button"><i class="swatch blue"></i><span class="pattern-name">蓝色</span><span class="pattern-index">B</span></button>
+            <button class="pattern-button" data-pattern="white" aria-pressed="false" type="button"><i class="swatch white"></i><span class="pattern-name">白色</span><span class="pattern-index">W</span></button>
+            <button class="pattern-button" data-pattern="black" aria-pressed="false" type="button"><i class="swatch black"></i><span class="pattern-name">黑色</span><span class="pattern-index">K</span></button>
+            <button class="pattern-button" data-pattern="stripes" aria-pressed="false" type="button"><i class="swatch stripes"></i><span class="pattern-name">RGB 交替条纹</span><span class="pattern-index">1 px</span></button>
+            <button class="pattern-button" data-pattern="checkerboard" aria-pressed="false" type="button"><i class="swatch checker"></i><span class="pattern-name">黑白棋盘格</span><span class="pattern-index">32 px</span></button>
+            <button class="pattern-button" data-pattern="motion" aria-pressed="false" type="button"><i class="swatch motion"></i><span class="pattern-name">运动帧计数</span><span class="pattern-index">LIVE</span></button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><h2>连续运行计时</h2><span class="small-label">30 MIN TARGET</span></div>
+          <div class="timer-row">
+            <output class="timer-value" id="timerValue" aria-live="off">00:00:00</output>
+            <div class="timer-state" id="timerState">尚未开始<br>目标 00:30:00</div>
+          </div>
+          <div class="progress" role="progressbar" aria-label="30分钟运行目标" aria-valuemin="0" aria-valuemax="1800" aria-valuenow="0"><span id="progressFill"></span></div>
+          <div class="button-row">
+            <button class="action-button automated" id="autoTestButton" type="button">一键全屏自动测试 · 30 分钟</button>
+          </div>
+          <div class="button-row">
+            <button class="action-button primary" id="startButton" type="button">开始计时</button>
+            <button class="action-button subtle" id="resetButton" type="button">重置本次记录</button>
+          </div>
+          <p class="automation-note">先依次全屏显示 R/G/B/白/黑、RGB 条纹和棋盘格，各 5 秒；再用运动帧计数连续运行 30 分钟，完成后自动导出 CSV。自动测试期间按 1–7 记录异常：闪屏、疑似丢帧、欠读/读错误、撕裂、黑屏、局部缺行/花屏、画面停滞。</p>
+          <div class="session-start" id="sessionStart">开始时间：—</div>
+          <div class="telemetry-grid" aria-label="浏览器测试图端统计">
+            <div class="telemetry-card"><span>测试图动画帧</span><strong id="browserFrames">0</strong></div>
+            <div class="telemetry-card"><span>测试图实测帧率</span><strong id="browserFps">—</strong></div>
+            <div class="telemetry-card"><span>动画间隔 &gt;100 ms</span><strong id="browserGaps">0</strong></div>
+            <div class="telemetry-card"><span>最长动画间隔</span><strong id="browserMaxGap">0 ms</strong></div>
+          </div>
+          <p class="automation-note">以上只统计浏览器画布更新；不能检测 HDMI/FPGA 输出帧率或硬件丢帧。标签页切到后台时浏览器会降频，相关时段单独记录。</p>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><h2>记录异常事件</h2><span class="small-label">MANUAL LOG</span></div>
+          <div class="event-grid">
+            <button class="event-button" data-event="flicker" type="button"><strong id="count-flicker">0</strong><span>记录闪屏</span></button>
+            <button class="event-button" data-event="dropped-frame" type="button"><strong id="count-dropped-frame">0</strong><span>记录丢帧</span></button>
+            <button class="event-button" data-event="underflow" type="button"><strong id="count-underflow">0</strong><span>记录欠读</span></button>
+            <button class="event-button" data-event="tearing" type="button"><strong id="count-tearing">0</strong><span>记录撕裂</span></button>
+            <button class="event-button" data-event="black-screen" type="button"><strong id="count-black-screen">0</strong><span>记录黑屏</span></button>
+            <button class="event-button" data-event="partial-frame" type="button"><strong id="count-partial-frame">0</strong><span>局部缺行/花屏</span></button>
+            <button class="event-button" data-event="stuck-frame" type="button"><strong id="count-stuck-frame">0</strong><span>画面停滞</span></button>
+          </div>
+          <div class="led-grid" aria-label="手动记录 FPGA LED4 至 LED7 状态">
+            <label class="led-field">LED4<select id="led4"><option>亮</option><option>灭</option><option>闪烁</option><option selected>未知</option></select></label>
+            <label class="led-field">LED5<select id="led5"><option>亮</option><option>灭</option><option>闪烁</option><option selected>未知</option></select></label>
+            <label class="led-field">LED6<select id="led6"><option>亮</option><option>灭</option><option>闪烁</option><option selected>未知</option></select></label>
+            <label class="led-field">LED7<select id="led7"><option>亮</option><option>灭</option><option>闪烁</option><option selected>未知</option></select></label>
+          </div>
+          <button class="export-button" id="recordLedsButton" type="button">记录当前 LED4–LED7 状态</button>
+          <ol class="event-list" id="eventList"><li class="empty-events">尚无异常记录</li></ol>
+          <button class="export-button" id="exportButton" type="button">导出本次记录 CSV</button>
+        </section>
+      </aside>
+    </div>
+
+    <footer class="bottom-note"><strong>说明：</strong>动画帧率和卡顿统计只反映浏览器测试图端；它不是 HDMI 刷新率、FPGA 帧率或硬件丢帧计数。屏幕异常和 LED4–LED7 仍需人工观察并记录。</footer>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const canvas = document.getElementById("patternCanvas");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      const patternNames = {
+        red: "红色纯色", green: "绿色纯色", blue: "蓝色纯色",
+        white: "白色纯色", black: "黑色纯色", stripes: "RGB 交替条纹（1 像素）",
+        checkerboard: "黑白棋盘格（32 像素）", motion: "运动帧计数"
+      };
+      const eventNames = { flicker: "闪屏", "dropped-frame": "疑似丢帧", underflow: "欠读/读错误", tearing: "撕裂", "black-screen": "黑屏", "partial-frame": "局部缺行/花屏", "stuck-frame": "画面停滞" };
+      const colors = { red: "#ff0000", green: "#00ff00", blue: "#0000ff", white: "#ffffff", black: "#000000" };
+      const AUTO_DURATION_MS = 30 * 60 * 1000;
+      const AUTO_PREFLIGHT_PATTERNS = ["red", "green", "blue", "white", "black", "stripes", "checkerboard"];
+      const AUTO_PREFLIGHT_STEP_MS = 5000;
+      const events = [];
+      let selectedPattern = "red";
+      let animationFrame = 0;
+      let timerInterval = null;
+      let runStartedAt = null;
+      let accumulatedMs = 0;
+      let sessionStartedAt = null;
+      let barPosition = -100;
+      let cleanView = false;
+      let sessionMode = "手动计时";
+      let autoRunActive = false;
+      let autoRunCompleted = false;
+      let autoPreflightStartedAt = null;
+      let autoPreflightInterval = null;
+      let wakeLock = null;
+      let motionFrames = 0;
+      let motionElapsedMs = 0;
+      let previousMotionTimestamp = null;
+      let longAnimationGaps = 0;
+      let maxAnimationGapMs = 0;
+      let hiddenTransitions = 0;
+      const ledSnapshots = [];
+
+      const timerValue = document.getElementById("timerValue");
+      const timerState = document.getElementById("timerState");
+      const progress = document.querySelector(".progress");
+      const progressFill = document.getElementById("progressFill");
+      const startButton = document.getElementById("startButton");
+      const eventList = document.getElementById("eventList");
+
+      function elapsedMs() {
+        return accumulatedMs + (runStartedAt === null ? 0 : performance.now() - runStartedAt);
+      }
+
+      function formatDuration(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
+      }
+
+      function localTimestamp(date) {
+        return new Intl.DateTimeFormat("zh-CN", {
+          year: "numeric", month: "2-digit", day: "2-digit",
+          hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+        }).format(date);
+      }
+
+      function setPattern(patternId) {
+        if (!Object.hasOwn(patternNames, patternId)) return;
+        selectedPattern = patternId;
+        document.querySelectorAll(".pattern-button").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.pattern === patternId));
+        });
+        document.getElementById("currentPatternName").textContent = patternNames[patternId];
+        drawPattern();
+      }
+
+      function drawPattern() {
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.imageSmoothingEnabled = false;
+
+        if (Object.hasOwn(colors, selectedPattern)) {
+          ctx.fillStyle = colors[selectedPattern];
+          ctx.fillRect(0, 0, width, height);
+          return;
+        }
+
+        if (selectedPattern === "stripes") {
+          const stripeColors = ["#ff0000", "#00ff00", "#0000ff"];
+          for (let x = 0; x < width; x += 1) {
+            ctx.fillStyle = stripeColors[x % stripeColors.length];
+            ctx.fillRect(x, 0, 1, height);
+          }
+          return;
+        }
+
+        if (selectedPattern === "checkerboard") {
+          const cell = 32;
+          for (let y = 0; y < height; y += cell) {
+            for (let x = 0; x < width; x += cell) {
+              ctx.fillStyle = ((x / cell + y / cell) % 2 === 0) ? "#ffffff" : "#000000";
+              ctx.fillRect(x, y, cell, cell);
+            }
+          }
+          return;
+        }
+
+        if (selectedPattern === "motion") drawMotionPattern(width, height);
+      }
+
+      function drawMotionPattern(width, height) {
+        ctx.fillStyle = "#090d12";
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.strokeStyle = "#26323d";
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= width; x += 64) {
+          ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, height); ctx.stroke();
+        }
+        for (let y = 0; y <= height; y += 64) {
+          ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(width, y + 0.5); ctx.stroke();
+        }
+
+        const x = ((barPosition % (width + 220)) + (width + 220)) % (width + 220) - 110;
+        ctx.fillStyle = "#70e0c0";
+        ctx.fillRect(x, 210, 110, 300);
+        ctx.fillStyle = "#10151c";
+        ctx.fillRect(x + 12, 222, 86, 276);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "600 58px Cascadia Code, Consolas, monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(animationFrame).padStart(8, "0"), width / 2, height / 2);
+        ctx.fillStyle = "#9aa8b7";
+        ctx.font = "20px Microsoft YaHei UI, sans-serif";
+        ctx.fillText("浏览器画布帧序号 · 非链路帧率", width / 2, height / 2 + 58);
+      }
+
+      function animate(timestamp) {
+        if (selectedPattern === "motion") {
+          if (previousMotionTimestamp !== null) {
+            const gap = timestamp - previousMotionTimestamp;
+            // Ignore long gaps in the active-time FPS denominator, but record them as source-side stalls.
+            if (gap <= 1000) motionElapsedMs += gap;
+            if (gap > 100) longAnimationGaps += 1;
+            maxAnimationGapMs = Math.max(maxAnimationGapMs, gap);
+          }
+          previousMotionTimestamp = timestamp;
+          motionFrames += 1;
+          animationFrame += 1;
+          barPosition += 3;
+          drawPattern();
+          updateTelemetry();
+        } else {
+          previousMotionTimestamp = null;
+        }
+        requestAnimationFrame(animate);
+      }
+
+      function updateTelemetry() {
+        const fps = motionElapsedMs > 0 ? ((motionFrames - 1) * 1000 / motionElapsedMs) : 0;
+        document.getElementById("browserFrames").textContent = String(motionFrames);
+        document.getElementById("browserFps").textContent = motionElapsedMs > 0 ? fps.toFixed(1) : "—";
+        document.getElementById("browserGaps").textContent = String(longAnimationGaps);
+        document.getElementById("browserMaxGap").textContent = `${maxAnimationGapMs.toFixed(0)} ms`;
+      }
+
+      function updateTimer() {
+        const ms = elapsedMs();
+        const seconds = Math.floor(ms / 1000);
+        if (autoRunActive) {
+          if (ms >= AUTO_DURATION_MS) {
+            finishAutomaticTest();
+            return;
+          }
+        }
+        timerValue.textContent = formatDuration(ms);
+        progressFill.style.width = `${Math.min(100, (ms / AUTO_DURATION_MS) * 100)}%`;
+        progress.setAttribute("aria-valuenow", String(Math.min(1800, seconds)));
+        if (autoRunCompleted) {
+          timerState.innerHTML = "自动测试完成<br>CSV 已生成";
+        } else if (autoRunActive && runStartedAt !== null) {
+          timerState.innerHTML = "自动测试运行中<br>结束后导出 CSV";
+        } else if (runStartedAt !== null) {
+          timerState.innerHTML = seconds >= 1800 ? "已达到 30 分钟目标<br>仍在计时" : "计时运行中<br>目标 00:30:00";
+        } else if (sessionStartedAt) {
+          timerState.innerHTML = seconds >= 1800 ? "已达到 30 分钟目标<br>计时已暂停" : "计时已暂停<br>可继续记录";
+        } else {
+          timerState.innerHTML = "尚未开始<br>目标 00:30:00";
+        }
+      }
+
+      function updateAutomaticPattern() {
+        const ms = performance.now() - autoPreflightStartedAt;
+        const stepIndex = Math.floor(ms / AUTO_PREFLIGHT_STEP_MS);
+        const pattern = stepIndex < AUTO_PREFLIGHT_PATTERNS.length
+          ? AUTO_PREFLIGHT_PATTERNS[stepIndex]
+          : null;
+        if (pattern !== null) {
+          if (pattern !== selectedPattern) setPattern(pattern);
+          return;
+        }
+        window.clearInterval(autoPreflightInterval);
+        autoPreflightInterval = null;
+        autoPreflightStartedAt = null;
+        setPattern("motion");
+        startButton.disabled = false;
+        startTimer();
+      }
+
+      function startTimer() {
+        if (runStartedAt !== null) {
+          pauseTimer();
+          return;
+        }
+        if (sessionStartedAt === null) {
+          sessionStartedAt = new Date();
+          if (!autoRunActive) sessionMode = "手动计时";
+          document.getElementById("sessionStart").textContent = `开始时间：${localTimestamp(sessionStartedAt)}`;
+        }
+        runStartedAt = performance.now();
+        startButton.textContent = "暂停计时";
+        startButton.classList.add("primary");
+        if (timerInterval === null) timerInterval = window.setInterval(updateTimer, 250);
+        updateTimer();
+      }
+
+      function pauseTimer() {
+        if (runStartedAt === null) return;
+        accumulatedMs += performance.now() - runStartedAt;
+        runStartedAt = null;
+        startButton.textContent = "继续计时";
+        if (timerInterval !== null) {
+          window.clearInterval(timerInterval);
+          timerInterval = null;
+        }
+        updateTimer();
+      }
+
+      function startAutomaticTest() {
+        if (autoRunActive) return;
+        if (sessionStartedAt !== null || events.length > 0 || ledSnapshots.length > 0 || accumulatedMs > 0) {
+          timerState.innerHTML = "先导出或重置<br>上一次记录";
+          return;
+        }
+
+        const app = document.getElementById("app");
+        if (typeof app.requestFullscreen === "function" && !document.fullscreenElement) {
+          app.requestFullscreen().catch(() => {
+            cleanView = true;
+            document.body.classList.add("clean-view");
+          });
+        } else {
+          cleanView = true;
+          document.body.classList.add("clean-view");
+        }
+
+        sessionMode = "自动 30 分钟测试";
+        autoRunActive = true;
+        autoRunCompleted = false;
+        autoPreflightStartedAt = performance.now();
+        startButton.disabled = true;
+        document.getElementById("autoTestButton").disabled = true;
+        setPattern(AUTO_PREFLIGHT_PATTERNS[0]);
+        timerState.innerHTML = "图案预检中<br>每种图案 5 秒";
+        autoPreflightInterval = window.setInterval(updateAutomaticPattern, 100);
+        acquireWakeLock();
+      }
+
+      function finishAutomaticTest() {
+        if (!autoRunActive) return;
+        autoRunActive = false;
+        autoRunCompleted = true;
+        pauseTimer();
+        startButton.textContent = "测试已完成";
+        startButton.disabled = true;
+        releaseWakeLock();
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        window.setTimeout(downloadCsv, 250);
+        updateTimer();
+      }
+
+      async function acquireWakeLock() {
+        if (!("wakeLock" in navigator)) return;
+        try {
+          wakeLock = await navigator.wakeLock.request("screen");
+          wakeLock.addEventListener("release", () => { wakeLock = null; }, { once: true });
+        } catch (_) {
+          // Wake Lock may be unavailable; the user can keep the computer awake manually.
+        }
+      }
+
+      function releaseWakeLock() {
+        if (wakeLock) {
+          wakeLock.release().catch(() => {});
+          wakeLock = null;
+        }
+      }
+
+      function resetSession(force = false) {
+        if (!force && (autoRunActive || events.length > 0 || ledSnapshots.length > 0 || accumulatedMs > 0 || runStartedAt !== null) && !window.confirm("重置会清除本次计时和所有事件记录。确定继续吗？")) return;
+        if (timerInterval !== null) window.clearInterval(timerInterval);
+        if (autoPreflightInterval !== null) window.clearInterval(autoPreflightInterval);
+        timerInterval = null;
+        autoPreflightInterval = null;
+        autoPreflightStartedAt = null;
+        runStartedAt = null;
+        accumulatedMs = 0;
+        sessionStartedAt = null;
+        sessionMode = "手动计时";
+        autoRunActive = false;
+        autoRunCompleted = false;
+        releaseWakeLock();
+        events.length = 0;
+        ledSnapshots.length = 0;
+        motionFrames = 0;
+        motionElapsedMs = 0;
+        previousMotionTimestamp = null;
+        longAnimationGaps = 0;
+        maxAnimationGapMs = 0;
+        hiddenTransitions = 0;
+        startButton.textContent = "开始计时";
+        startButton.disabled = false;
+        document.getElementById("autoTestButton").disabled = false;
+        document.getElementById("sessionStart").textContent = "开始时间：—";
+        updateEventList();
+        updateTelemetry();
+        updateTimer();
+      }
+
+      function recordEvent(eventType) {
+        if (!Object.hasOwn(eventNames, eventType)) return;
+        events.push({ type: eventType, elapsed: elapsedMs(), timestamp: new Date() });
+        updateEventList();
+      }
+
+      function recordLedSnapshot() {
+        ledSnapshots.push({
+          elapsed: elapsedMs(), timestamp: new Date(),
+          led4: document.getElementById("led4").value,
+          led5: document.getElementById("led5").value,
+          led6: document.getElementById("led6").value,
+          led7: document.getElementById("led7").value
+        });
+        updateEventList();
+      }
+
+      function updateEventList() {
+        const counts = Object.fromEntries(Object.keys(eventNames).map((type) => [type, 0]));
+        events.forEach((event) => { counts[event.type] += 1; });
+        Object.entries(counts).forEach(([type, count]) => {
+          document.getElementById(`count-${type}`).textContent = String(count);
+        });
+
+        eventList.replaceChildren();
+        if (events.length === 0 && ledSnapshots.length === 0) {
+          const empty = document.createElement("li");
+          empty.className = "empty-events";
+          empty.textContent = "尚无异常记录或 LED 快照";
+          eventList.append(empty);
+          return;
+        }
+        events.slice().reverse().forEach((event) => {
+          const item = document.createElement("li");
+          const label = document.createElement("strong");
+          label.textContent = eventNames[event.type];
+          const time = document.createElement("time");
+          time.textContent = `${formatDuration(event.elapsed)} · ${new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(event.timestamp)}`;
+          item.append(label, time);
+          eventList.append(item);
+        });
+        ledSnapshots.slice().reverse().forEach((snapshot) => {
+          const item = document.createElement("li");
+          const label = document.createElement("strong");
+          label.textContent = `LED4–7 ${snapshot.led4}/${snapshot.led5}/${snapshot.led6}/${snapshot.led7}`;
+          const time = document.createElement("time");
+          time.textContent = `${formatDuration(snapshot.elapsed)} · ${new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(snapshot.timestamp)}`;
+          item.append(label, time);
+          eventList.append(item);
+        });
+      }
+
+      function csvCell(value) {
+        return `"${String(value).replaceAll('"', '""')}"`;
+      }
+
+      function downloadCsv() {
+        const started = sessionStartedAt ? localTimestamp(sessionStartedAt) : "未开始";
+        const status = autoRunCompleted ? "自动测试完成" : autoRunActive ? "自动测试未完成" : "手动记录";
+        const hardwareStatus = "未接入 FPGA 自动采集；屏幕异常和 LED 状态由人工观察记录";
+        const rows = [
+          ["记录类型", "测试模式", "会话开始时间", "累计运行时间", "测试状态", "事件类型", "运行时间位置", "记录时刻", "硬件状态采集", "浏览器动画帧", "浏览器动画平均帧率", "动画间隔>100ms次数", "最长动画间隔ms", "标签页切后台次数", "LED4", "LED5", "LED6", "LED7"],
+          ["会话摘要", sessionMode, started, formatDuration(elapsedMs()), status, "", "", "", hardwareStatus, motionFrames, document.getElementById("browserFps").textContent, longAnimationGaps, maxAnimationGapMs.toFixed(1), hiddenTransitions, "", "", "", ""]
+        ];
+        events.forEach((event) => {
+          rows.push(["异常事件", sessionMode, started, formatDuration(elapsedMs()), status, eventNames[event.type], formatDuration(event.elapsed), localTimestamp(event.timestamp), hardwareStatus, "", "", "", "", "", "", "", "", ""]);
+        });
+        ledSnapshots.forEach((snapshot) => {
+          rows.push(["LED快照", sessionMode, started, formatDuration(elapsedMs()), status, "", formatDuration(snapshot.elapsed), localTimestamp(snapshot.timestamp), hardwareStatus, "", "", "", "", "", snapshot.led4, snapshot.led5, snapshot.led6, snapshot.led7]);
+        });
+        const csv = "\uFEFF" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+        const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `rgbx8888-test-${new Date().toISOString().replaceAll(":", "-").slice(0, 19)}.csv`;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      async function toggleCleanView() {
+        try {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          } else {
+            await document.getElementById("app").requestFullscreen();
+          }
+        } catch (error) {
+          // Some browsers disallow fullscreen from local files; clean view still works.
+          cleanView = !cleanView;
+          document.body.classList.toggle("clean-view", cleanView);
+        }
+      }
+
+      document.querySelectorAll(".pattern-button").forEach((button) => {
+        button.addEventListener("click", () => setPattern(button.dataset.pattern));
+      });
+      document.querySelectorAll(".event-button").forEach((button) => {
+        button.addEventListener("click", () => recordEvent(button.dataset.event));
+      });
+      document.getElementById("fullscreenButton").addEventListener("click", toggleCleanView);
+      document.getElementById("startButton").addEventListener("click", startTimer);
+      document.getElementById("resetButton").addEventListener("click", resetSession);
+      document.getElementById("autoTestButton").addEventListener("click", startAutomaticTest);
+      document.getElementById("exportButton").addEventListener("click", downloadCsv);
+      document.getElementById("recordLedsButton").addEventListener("click", recordLedSnapshot);
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          hiddenTransitions += 1;
+          previousMotionTimestamp = null;
+        }
+      });
+      document.addEventListener("fullscreenchange", () => {
+        cleanView = Boolean(document.fullscreenElement);
+        document.body.classList.toggle("clean-view", cleanView);
+      });
+      document.addEventListener("keydown", (event) => {
+        const eventHotkeys = { "1": "flicker", "2": "dropped-frame", "3": "underflow", "4": "tearing", "5": "black-screen", "6": "partial-frame", "7": "stuck-frame" };
+        if (autoRunActive && sessionStartedAt !== null && Object.hasOwn(eventHotkeys, event.key) && !(event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable='true']"))) {
+          recordEvent(eventHotkeys[event.key]);
+          event.preventDefault();
+          return;
+        }
+        if (event.key.toLowerCase() !== "f" || event.repeat || (event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable='true']"))) return;
+        event.preventDefault();
+        toggleCleanView();
+      });
+
+      setPattern(selectedPattern);
+      updateTimer();
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>

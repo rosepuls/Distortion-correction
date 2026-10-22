@@ -1,0 +1,57 @@
+    // The engine owns both leases until every ID-1 write has drained.
+    frame_copy_engine copy_engine (
+        .clk(ddr_clk), .rstn(ddr_rstn),
+        .start(copy_start), .start_ready(copy_start_ready),
+        .input_slot(copy_input_slot), .output_slot(copy_output_slot),
+        .input_sequence(copy_input_sequence),
+        .copy_done(copy_done), .copy_error(copy_error),
+        .active(copy_engine_active), .fatal_fault(copy_fatal_fault),
+        .completed_sequence(copy_completed_sequence),
+        .read_valid(copy_read_valid), .read_addr(copy_read_addr),
+        .read_len(copy_read_len), .read_reserve(copy_read_reserve),
+        .read_ready(copy_read_ready), .read_rvalid(copy_read_rvalid),
+        .read_rdata(copy_read_rdata), .read_rlast(copy_read_rlast),
+        .write_awvalid(copy_write_awvalid), .write_awaddr(copy_write_awaddr),
+        .write_awlen(copy_write_awlen), .write_awready(copy_write_awready),
+        .write_wvalid(copy_write_wvalid), .write_wdata(copy_write_wdata),
+        .write_wstrb(copy_write_wstrb), .write_wready(copy_write_wready),
+        .write_wlast(copy_write_wlast), .write_source_busy(copy_source_busy),
+        .copy_write_idle(copy_physical_drained),
+        .read_fault(read_arbiter_error_count != 16'd0),
+        .write_fault(write_arbiter_fault || write_protocol_fault)
+    );
+    assign copy_physical_drained = !copy_source_busy &&
+        (copy_outstanding == 16'd0) &&
+        !(axi_awvalid && axi_awid == 4'd1) &&
+        !(axi_wready && axi_wlast && axi_wusero_id == 4'd1);
+    // The adapter clears its frame-local block at the next VS when drained.
+    // Its cumulative error counter remains sticky for diagnosis and must not
+    // disable every later frame after a single recoverable underrun.
+    assign display_pipe_ok = display_valid && !display_frame_blocked &&
+        (read_arbiter_error_count == 16'd0);
+    // AW and all W beats stay with one source until the Pango completion beat.
+    // The capture controller must not see a copy burst's WLAST.
+    ddr_write_burst_arbiter write_arbiter (
+        .clk(ddr_clk), .rstn(ddr_rstn),
+        .c0_awvalid(capture_axi_awvalid), .c0_awaddr(capture_axi_awaddr),
+        .c0_awlen(capture_axi_awlen), .c0_awready(capture_axi_awready),
+        .c0_wvalid(capture_axi_wvalid), .c0_wdata(capture_axi_wdata),
+        .c0_wstrb(capture_axi_wstrb), .c0_wready(capture_axi_wready),
+        .c0_wlast(capture_axi_wlast),
+        .c1_awvalid(copy_write_awvalid), .c1_awaddr(copy_write_awaddr),
+        .c1_awlen(copy_write_awlen), .c1_awready(copy_write_awready),
+        .c1_wvalid(copy_write_wvalid), .c1_wdata(copy_write_wdata),
+        .c1_wstrb(copy_write_wstrb), .c1_wready(copy_write_wready),
+        .c1_wlast(copy_write_wlast),
+        .axi_awaddr(axi_awaddr), .axi_awid(axi_awid),
+        .axi_awlen(axi_awlen), .axi_awvalid(axi_awvalid),
+        .axi_awready(axi_awready), .axi_wdata(axi_wdata),
+        .axi_wstrb(axi_wstrb), .axi_wvalid(axi_wvalid),
+        .axi_wready(axi_wready), .axi_wlast(axi_wlast),
+        .axi_wusero_id(axi_wusero_id), .busy(),
+        .protocol_error_count(write_arbiter_error_count),
+        .protocol_fault(write_arbiter_fault)
+    );
+    assign axi_awsize = 3'b110;
+    assign axi_awburst = 2'b01;
+    assign capture_write_idle = tracked_capture_write_idle && !write_arbiter_fault;

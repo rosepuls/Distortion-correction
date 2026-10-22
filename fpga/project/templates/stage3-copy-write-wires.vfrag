@@ -1,0 +1,31 @@
+    wire [27:0] capture_axi_awaddr;
+    wire [3:0] capture_axi_awid, capture_axi_awlen;
+    wire [255:0] capture_axi_wdata;
+    wire [31:0] capture_axi_wstrb;
+    wire capture_axi_awvalid, capture_axi_awready;
+    wire capture_axi_wvalid, capture_axi_wready, capture_axi_wlast;
+    wire tracked_capture_write_idle, write_arbiter_fault;
+    wire [15:0] write_arbiter_error_count /* synthesis PAP_MARK_DEBUG="1" */;
+    wire copy_start, copy_start_ready, copy_done, copy_error;
+    wire [1:0] copy_input_slot, copy_output_slot;
+    wire copy_source_busy, copy_engine_active, copy_fatal_fault;
+    wire [31:0] copy_completed_sequence;
+    wire copy_read_valid, copy_read_reserve, copy_read_ready;
+    wire [27:0] copy_read_addr;
+    wire [3:0] copy_read_len;
+    wire copy_read_rvalid, copy_read_rlast;
+    wire [255:0] copy_read_rdata;
+    wire copy_write_awvalid, copy_write_awready;
+    wire [27:0] copy_write_awaddr;
+    wire [3:0] copy_write_awlen;
+    wire copy_write_wvalid, copy_write_wready, copy_write_wlast;
+    wire [255:0] copy_write_wdata;
+    wire [31:0] copy_write_wstrb;
+    wire [15:0] copy_outstanding /* synthesis PAP_MARK_DEBUG="1" */;
+    wire copy_physical_drained, display_pipe_ok;
+    wire [15:0] pipeline_status /* synthesis PAP_MARK_DEBUG="1" */;
+    assign pipeline_status = {5'd0, copy_physical_drained,
+        capture_write_idle, output_frame_complete, display_frame_blocked,
+        read_arbiter_error_count != 16'd0, display_read_error_count != 16'd0,
+        write_protocol_fault, write_arbiter_fault, copy_fatal_fault,
+        copy_active, display_valid};

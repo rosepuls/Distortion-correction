@@ -1,0 +1,35 @@
+    display_read_adapter display_adapter (
+        .clk(ddr_clk), .rstn(ddr_rstn), .frame_reset(output_frame_start),
+        .line_valid(rd_cmd_en), .line_addr(rd_cmd_addr),
+        .line_beats(rd_cmd_len[9:0]), .line_ready(rd_cmd_ready),
+        .consumed_gray(display_consumed_gray),
+        .client_valid(display_client_valid), .client_addr(display_client_addr),
+        .client_len(display_client_len), .client_reserve(display_client_reserve),
+        .client_ready(display_client_ready),
+        .client_rvalid(display_client_rvalid),
+        .client_rdata(display_client_rdata), .client_rlast(display_client_rlast),
+        .sink_rvalid(read_en), .sink_rdata(read_rdata), .sink_write_gray(),
+        .line_done(rd_cmd_done), .line_error(display_line_error),
+        .frame_blocked(display_frame_blocked), .busy(),
+        .received_beats(display_received_beats),
+        .protocol_error_count(display_read_error_count)
+    );
+
+    ddr_read_burst_arbiter read_arbiter (
+        .clk(ddr_clk), .rstn(ddr_rstn),
+        .c0_valid(display_client_valid), .c0_addr(display_client_addr),
+        .c0_len(display_client_len), .c0_reserve(display_client_reserve),
+        .c0_ready(display_client_ready), .c0_rvalid(display_client_rvalid),
+        .c0_rdata(display_client_rdata), .c0_rlast(display_client_rlast),
+        .c1_valid(1'b0), .c1_addr(28'd0), .c1_len(4'd15),
+        .c1_reserve(1'b0), .c1_ready(), .c1_rvalid(),
+        .c1_rdata(), .c1_rlast(),
+        .axi_araddr(axi_araddr), .axi_arid(axi_arid), .axi_arlen(axi_arlen),
+        .axi_arvalid(axi_arvalid), .axi_arready(axi_arready),
+        .axi_rdata(axi_rdata), .axi_rvalid(axi_rvalid), .axi_rlast(axi_rlast),
+        .axi_rid(axi_rid),
+        .busy(), .response_error_count(read_arbiter_error_count)
+    );
+    assign axi_arsize = 3'b110; // Preserve the accepted Pango read controller setting
+    assign axi_arburst = 2'b01;
+    assign axi_rready = 1'b1;
