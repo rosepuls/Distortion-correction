@@ -36,6 +36,7 @@
 **/report_power/
 **/log/
 **/logbackup/
+**/*.pds.lock
 **/generate.log
 **/__pycache__/
 *.pyc

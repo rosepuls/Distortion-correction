@@ -1,8 +1,9 @@
 `timescale 1ns / 1ps
 
-// Fixed radial mapper used by the Stage 4 on-board algorithm demonstration.
-// It implements source = output + (output-center)*r^2/2^23.  The arithmetic
-// output is signed Q16.16; image-border handling remains in the sampler.
+// Fixed radial mapper used for visual demonstrations. RADIAL_DENOM_SHIFT
+// selects the effective radial strength; for 1280x720, shift 21 is about
+// k1=+0.25 when r^2 is normalized by 2^19. The arithmetic output is signed
+// Q16.16; image-border handling remains in the sampler.
 module demo_radial_mapper #(
     parameter integer CENTER_X = 640,
     parameter integer CENTER_Y = 360,

@@ -6,7 +6,7 @@
 
 - `identity_mapper.sv`：输出单位映射坐标和单位雅可比矩阵。
 - `coordinate_fifo.sv`：深度可配置的宽坐标队列，保存坐标、四个雅可比元素、有效标志和帧元数据；支持非二次幂深度以及满队列时同周期出队/入队。
-- `identity_coordinate_pipeline.sv`：连接单位映射器与坐标队列，作为后续采样规划器的板卡无关输入级。
+- `identity_coordinate_pipeline.sv`：连接映射器与坐标队列；默认使用单位映射，`RADIAL_MAPPING=1` 时选用固定径向演示映射。
 - `bilinear_sample_planner.sv`：将有符号 Q16.16 源坐标拆成 2×2 邻域、16 位水平/垂直权重和逐邻点有效掩码。
 - `bilinear_interpolator.sv`：对读取完成的四个 RGBX8888 邻点执行位精确双线性插值并输出 RGBX8888。
 - `demo_radial_mapper.sv`：Stage 4 板测用固定径向映射器，中心不变、边缘向外取样；它用于验证公共坐标接口，不代表真实镜头标定。
@@ -14,6 +14,8 @@
 - `stage4_demo_pipeline.sv`：连接径向映射器、坐标 FIFO、双线性规划器、片上源图和插值核。
 - `stage4_demo_frame_source.sv`：把 HDMI 有效区转换为完整帧扫描请求，并检查输入停顿和输出像素序号。
 - `stage4_demo_fram_buf.v`：与厂商视频顶层同端口的 Stage 4 板测包装器，关闭 DDR 业务请求并直接输出算法图像。
+- `pipelined_bilinear_interpolator.sv`：与原插值器位精确一致的三级弹性流水线，把缓存输出选择、水平加权和垂直加权隔开，供 125 MHz DDR 时钟域使用。
+- `stage5_identity_pipeline.sv`：真实 DDR 帧的采样闭环；Stage 5 选择单位映射，Stage 6 选择固定径向映射并对越界邻点填黑。
 
 ## 坐标约定
 
@@ -57,4 +59,10 @@
 - 演示映射器未计算局部导数，因此四个 Jacobian 元素置零并令 `J_valid=0`。
 - 片上源图按整数源坐标生成 RGBX8888 渐变，每隔 64 像素产生白色网格线；四角越界后按常量黑色逐邻点混合。
 - 完整 1280×720 仿真验证了 921,600 个连续像素、首点/中心/末点颜色、帧完成及无停顿。
-- 此演示用于确认阶段 4 映射、边界、插值和 HDMI 输出。真实相机画面仍需后续 Tile Cache/DDR 读取器替换 `procedural_pixel_reader`。
+- 此演示用于确认阶段 4 映射、边界、插值和 HDMI 输出。Stage 5 已在独立工程中把真实相机画面接到 Tile Cache/DDR 读取器；上板结论见 `docs/results/stage5-identity-ddr.md`。
+
+## Stage 6 真实帧广角试值映射
+
+- 独立 `stage6_radial_ddr` 工程在真实 DDR 输入帧上使用 `stage6_brown_mapper.sv` 固定 Brown-Conrady 试值。`RADIAL_MAPPING=1` 仍是该工程选择映射分支的兼容开关；规划器继续处理越界邻点，Stage 5 单位映射工程保留作对照。
+- 当前归一化尺度为 512，视觉试值 `k1=-0.25`、`k2=+0.0625`、`p1=+0.03125`、`p2=-0.03125`。中心点固定，邻近区域和外围都参与重映射；这组数值不由 120° 视场角推导，真实相机仍需标定。
+- 定向仿真和 PDS 结果记录于 `docs/results/stage6-radial-ddr.md`。

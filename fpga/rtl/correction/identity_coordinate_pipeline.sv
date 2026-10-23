@@ -2,7 +2,11 @@
 
 module identity_coordinate_pipeline #(
     parameter integer FIFO_DEPTH = 16,
-    parameter integer LEVEL_WIDTH = (FIFO_DEPTH <= 1) ? 1 : $clog2(FIFO_DEPTH + 1)
+    parameter integer LEVEL_WIDTH = (FIFO_DEPTH <= 1) ? 1 : $clog2(FIFO_DEPTH + 1),
+    parameter integer RADIAL_MAPPING = 0,
+    parameter integer CENTER_X = 640,
+    parameter integer CENTER_Y = 360,
+    parameter integer RADIAL_DENOM_SHIFT = 23
 ) (
     input  wire                       clk,
     input  wire                       rstn,
@@ -54,6 +58,26 @@ module identity_coordinate_pipeline #(
     wire mapper_eol;
     wire mapper_eof;
 
+    generate if (RADIAL_MAPPING != 0) begin : radial_mapping
+    demo_radial_mapper #(
+        .CENTER_X(CENTER_X), .CENTER_Y(CENTER_Y),
+        .RADIAL_DENOM_SHIFT(RADIAL_DENOM_SHIFT)
+    ) mapper (
+        .clk(clk), .rstn(rstn), .s_valid(s_valid), .s_ready(s_ready),
+        .s_u(s_u), .s_v(s_v), .s_pixel_id(s_pixel_id),
+        .s_frame_id(s_frame_id), .s_param_version(s_param_version),
+        .s_sof(s_sof), .s_eol(s_eol), .s_eof(s_eof),
+        .m_valid(mapper_valid), .m_ready(mapper_ready),
+        .m_sx(mapper_sx), .m_sy(mapper_sy),
+        .m_geometry_valid(mapper_geometry_valid),
+        .m_j00(mapper_j00), .m_j01(mapper_j01),
+        .m_j10(mapper_j10), .m_j11(mapper_j11),
+        .m_j_valid(mapper_j_valid), .m_pixel_id(mapper_pixel_id),
+        .m_frame_id(mapper_frame_id),
+        .m_param_version(mapper_param_version),
+        .m_sof(mapper_sof), .m_eol(mapper_eol), .m_eof(mapper_eof)
+    );
+    end else begin : identity_mapping
     identity_mapper mapper (
         .clk(clk),
         .rstn(rstn),
@@ -84,6 +108,7 @@ module identity_coordinate_pipeline #(
         .m_eol(mapper_eol),
         .m_eof(mapper_eof)
     );
+    end endgenerate
 
     coordinate_fifo #(
         .DEPTH(FIFO_DEPTH),
