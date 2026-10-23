@@ -37,7 +37,9 @@ module ddr_read_burst_arbiter (
     input  wire [3:0]   axi_rid,
 
     output reg          busy,
-    output reg  [15:0]  response_error_count
+    output reg  [15:0]  response_error_count,
+    output wire         c1_wait_arbiter,
+    output wire         c1_wait_arready
 );
     reg owner;
     reg prefer_c1;
@@ -77,6 +79,13 @@ module ddr_read_burst_arbiter (
     assign c1_rdata = axi_rdata;
     assign c0_rlast = c0_rvalid && axi_rlast;
     assign c1_rlast = c1_rvalid && axi_rlast;
+    // Attribute client-1 address stalls to arbitration (an older burst or
+    // client 0 owns the slot) versus DDR backpressure (client 1 is selected,
+    // but the controller has not accepted AR).
+    assign c1_wait_arbiter = rstn && c1_valid && c1_reserve &&
+                             (busy || !selected_owner);
+    assign c1_wait_arready = rstn && !busy && c1_valid && c1_reserve &&
+                             selected_owner && axi_arvalid && !axi_arready;
 
     always @(posedge clk or negedge rstn) begin
         if (!rstn) begin

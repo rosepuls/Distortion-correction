@@ -19,7 +19,7 @@ module tile_row_ddr_adapter_tb;
     wire [255:0] fill_data;
     wire [11:0] fill_out_tile_x, fill_out_tile_y;
     wire [1:0] fill_out_row_index, fill_beat_index;
-    wire idle, fatal_fault;
+    wire idle, fatal_fault, response_wait, first_beat_wait, interbeat_wait;
     wire [15:0] protocol_error_count;
     wire [31:0] completed_rows;
     integer i;
@@ -38,6 +38,8 @@ module tile_row_ddr_adapter_tb;
         .fill_out_tile_y(fill_out_tile_y),
         .fill_out_row_index(fill_out_row_index),
         .fill_beat_index(fill_beat_index), .idle(idle),
+        .read_response_wait(response_wait),
+        .first_beat_wait(first_beat_wait), .interbeat_wait(interbeat_wait),
         .fatal_fault(fatal_fault), .protocol_error_count(protocol_error_count),
         .completed_rows(completed_rows)
     );
@@ -80,8 +82,20 @@ module tile_row_ddr_adapter_tb;
             @(posedge clk);
             @(negedge clk);
             read_ready = 0;
+            if (!response_wait || !first_beat_wait || interbeat_wait)
+                $fatal(1, "FAIL: first response wait was not classified");
             fill_data_ready = 0;
-            for (i = 0; i < 4; i = i + 1) begin
+            i = 0;
+            read_rvalid = 1;
+            read_rdata = {8{32'hA5000000}};
+            read_rlast = 0;
+            @(posedge clk);
+            @(negedge clk);
+            read_rvalid = 0;
+            #1;
+            if (!response_wait || first_beat_wait || !interbeat_wait)
+                $fatal(1, "FAIL: interbeat response wait was not classified");
+            for (i = 1; i < 4; i = i + 1) begin
                 read_rvalid = 1;
                 read_rdata = {8{32'hA5000000 + i}};
                 read_rlast = (i == 3);

@@ -91,6 +91,13 @@ module fram_buf #(
     wire [1:0] copy_input_slot, copy_output_slot;
     wire copy_source_busy, copy_engine_active, copy_fatal_fault;
     wire [31:0] copy_completed_sequence;
+    wire [23:0] perf_frame_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [23:0] perf_coord_stall_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [23:0] perf_cache_miss_count /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [23:0] perf_cache_fill_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [23:0] perf_read_ar_wait_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [23:0] perf_read_response_wait_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [23:0] perf_write_wait_cycles /* synthesis PAP_MARK_DEBUG="true" */;
     wire copy_read_valid, copy_read_reserve, copy_read_ready;
     wire [27:0] copy_read_addr;
     wire [3:0] copy_read_len;
@@ -155,6 +162,7 @@ module fram_buf #(
     wire [31:0] copy_input_sequence;
     wire [31:0] copied_count /* synthesis PAP_MARK_DEBUG="true" */;
     wire [31:0] copy_error_count /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [15:0] perf_error_flags /* synthesis PAP_MARK_DEBUG="true" */;
     wire copy_active;
     reg [31:0] input_published_count /* synthesis PAP_MARK_DEBUG="true" */;
     reg [31:0] display_take_count /* synthesis PAP_MARK_DEBUG="true" */;
@@ -186,8 +194,26 @@ module fram_buf #(
         .copy_write_idle(copy_physical_drained),
         .read_fault(read_arbiter_error_count != 16'd0),
         .write_fault(write_arbiter_fault || write_protocol_fault),
-        .fetched_rows(), .tile_read_errors()
+        .fetched_rows(), .tile_read_errors(),
+        .perf_frame_cycles(perf_frame_cycles),
+        .perf_coord_stall_cycles(perf_coord_stall_cycles),
+        .perf_cache_miss_count(perf_cache_miss_count),
+        .perf_cache_fill_cycles(perf_cache_fill_cycles),
+        .perf_read_ar_wait_cycles(perf_read_ar_wait_cycles),
+        .perf_read_response_wait_cycles(perf_read_response_wait_cycles),
+        .perf_write_wait_cycles(perf_write_wait_cycles)
     );
+    assign perf_error_flags = {
+        8'd0,
+        copy_fatal_fault,
+        display_frame_blocked,
+        (incomplete_output_count != 16'd0),
+        (copy_error_count != 32'd0),
+        (write_protocol_error_count != 16'd0),
+        (write_arbiter_error_count != 16'd0),
+        (read_arbiter_error_count != 16'd0),
+        (display_read_error_count != 16'd0)
+    };
     assign copy_physical_drained = !copy_source_busy &&
         (copy_outstanding == 16'd0) &&
         !(axi_awvalid && axi_awid == 4'd1) &&

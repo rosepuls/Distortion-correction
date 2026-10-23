@@ -58,7 +58,12 @@ module cached_neighbor_reader #(
     output wire         idle,
     output wire         fatal_fault,
     output wire [15:0]  read_error_count,
-    output wire [31:0]  fetched_rows
+    output wire [31:0]  fetched_rows,
+    output wire [23:0]  diagnostic_miss_count,
+    output wire [23:0]  diagnostic_fill_cycles,
+    output wire         read_response_wait,
+    output wire         first_beat_wait,
+    output wire         interbeat_wait
 );
     localparam integer META_DEPTH = 8;
     reg [1:0] active_slot;
@@ -93,6 +98,7 @@ module cached_neighbor_reader #(
     wire [11:0] adapter_tile_x, adapter_tile_y;
     wire [1:0] adapter_row, adapter_beat;
     wire adapter_idle, adapter_fault;
+    wire [23:0] cache_miss_count, cache_fill_cycles;
     wire cache_invalidate = source_frame_start && count == 0 && adapter_idle;
     wire fifo_space = count < META_DEPTH;
     wire accept = s_valid && s_ready;
@@ -135,6 +141,8 @@ module cached_neighbor_reader #(
     assign m_eol = eol_mem[rd_ptr];
     assign m_eof = eof_mem[rd_ptr];
     assign idle = count == 0 && adapter_idle && !cache_rsp_valid;
+    assign diagnostic_miss_count = cache_miss_count;
+    assign diagnostic_fill_cycles = cache_fill_cycles;
 
     always @(posedge clk or negedge rstn) begin
         if (!rstn) begin
@@ -193,7 +201,9 @@ module cached_neighbor_reader #(
         .fill_row_index(cache_row),
         .fill_data_valid(adapter_data_valid), .fill_data_ready(adapter_data_ready),
         .fill_data(adapter_data), .fill_data_row_index(adapter_row),
-        .fill_data_beat_index(adapter_beat)
+        .fill_data_beat_index(adapter_beat),
+        .diagnostic_miss_count(cache_miss_count),
+        .diagnostic_fill_cycles(cache_fill_cycles)
     );
 
     tile_row_ddr_adapter #(
@@ -212,8 +222,12 @@ module cached_neighbor_reader #(
         .fill_data(adapter_data), .fill_out_tile_x(adapter_tile_x),
         .fill_out_tile_y(adapter_tile_y),
         .fill_out_row_index(adapter_row), .fill_beat_index(adapter_beat),
-        .idle(adapter_idle), .fatal_fault(adapter_fault),
+        .idle(adapter_idle),
+        .first_beat_wait(first_beat_wait),
+        .interbeat_wait(interbeat_wait),
+        .fatal_fault(adapter_fault),
         .protocol_error_count(read_error_count),
-        .completed_rows(fetched_rows)
+        .completed_rows(fetched_rows),
+        .read_response_wait(read_response_wait)
     );
 endmodule

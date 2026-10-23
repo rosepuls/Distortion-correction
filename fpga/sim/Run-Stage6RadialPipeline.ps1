@@ -1,4 +1,8 @@
-param([string]$VivadoHome = $env:VIVADO_HOME)
+param(
+    [string]$VivadoHome = $env:VIVADO_HOME,
+    [int]$CacheSets = 16,
+    [int]$CacheWays = 4
+)
 
 $ErrorActionPreference = 'Stop'
 if (-not $VivadoHome) { throw 'Set VIVADO_HOME or pass -VivadoHome.' }
@@ -30,7 +34,9 @@ Push-Location $work
 try {
     & $xvlog --sv --work work --log xvlog.log @sources
     if ($LASTEXITCODE -ne 0) { throw 'xvlog failed.' }
-    & $xelab work.stage6_radial_pipeline_tb -s stage6_radial_pipeline_tb_sim --log xelab.log
+    $setArg = '"CACHE_SETS=' + $CacheSets + '"'
+    $wayArg = '"CACHE_WAYS=' + $CacheWays + '"'
+    & $xelab work.stage6_radial_pipeline_tb -generic_top $setArg -generic_top $wayArg -s stage6_radial_pipeline_tb_sim --log xelab.log
     if ($LASTEXITCODE -ne 0) { throw 'xelab failed.' }
     & $xsim stage6_radial_pipeline_tb_sim -runall --log xsim.log
     if ($LASTEXITCODE -ne 0 -or

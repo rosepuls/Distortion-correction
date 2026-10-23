@@ -49,6 +49,9 @@ module stage5_identity_pipeline #(
     output wire                   reader_fault,
     output wire [15:0]            read_error_count,
     output wire [31:0]            fetched_rows,
+    output wire [23:0]            diagnostic_miss_count,
+    output wire [23:0]            diagnostic_fill_cycles,
+    output wire                   read_response_wait,
     output wire [LEVEL_WIDTH-1:0] fifo_level
 );
     wire coord_valid, coord_ready, coord_geometry_valid, coord_j_valid;
@@ -139,7 +142,10 @@ module stage5_identity_pipeline #(
         .read_ready(read_ready), .read_rvalid(read_rvalid),
         .read_rdata(read_rdata), .read_rlast(read_rlast),
         .idle(reader_idle), .fatal_fault(reader_fault),
-        .read_error_count(read_error_count), .fetched_rows(fetched_rows)
+        .read_error_count(read_error_count), .fetched_rows(fetched_rows),
+        .diagnostic_miss_count(diagnostic_miss_count),
+        .diagnostic_fill_cycles(diagnostic_fill_cycles),
+        .read_response_wait(read_response_wait)
     );
 
     pipelined_bilinear_interpolator interpolator (

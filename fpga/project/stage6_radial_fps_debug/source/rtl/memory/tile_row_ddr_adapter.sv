@@ -33,6 +33,7 @@ module tile_row_ddr_adapter #(
     output reg  [1:0]   fill_out_row_index,
     output wire [1:0]   fill_beat_index,
     output wire         idle,
+    output wire         read_response_wait,
     output reg          fatal_fault,
     output reg  [15:0]  protocol_error_count,
     output reg  [31:0]  completed_rows
@@ -66,6 +67,7 @@ module tile_row_ddr_adapter #(
     assign fill_data_valid = rstn && state == OUTPUT && !fatal_fault;
     assign fill_data = row_beats[output_index];
     assign fill_beat_index = output_index;
+    assign read_response_wait = (state == RECEIVE) && !read_rvalid;
 
     always @(posedge clk or negedge rstn) begin
         if (!rstn) begin

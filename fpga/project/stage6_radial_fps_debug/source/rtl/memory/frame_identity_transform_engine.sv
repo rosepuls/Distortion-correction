@@ -48,7 +48,14 @@ module frame_identity_transform_engine #(
     input  wire         read_fault,
     input  wire         write_fault,
     output wire [31:0]  fetched_rows,
-    output wire [15:0]  tile_read_errors
+    output wire [15:0]  tile_read_errors,
+    output reg  [23:0]  perf_frame_cycles,
+    output reg  [23:0]  perf_coord_stall_cycles,
+    output reg  [23:0]  perf_cache_miss_count,
+    output reg  [23:0]  perf_cache_fill_cycles,
+    output reg  [23:0]  perf_read_ar_wait_cycles,
+    output reg  [23:0]  perf_read_response_wait_cycles,
+    output reg  [23:0]  perf_write_wait_cycles
 );
     localparam integer PIXELS_PER_FRAME = IMAGE_WIDTH * IMAGE_HEIGHT;
     localparam integer PIXELS_PER_BURST = 128;
@@ -73,6 +80,14 @@ module frame_identity_transform_engine #(
     reg [10:0] request_u, response_u;
     reg [9:0] request_v;
     reg [31:0] stall_count;
+    reg [23:0] frame_cycle_count;
+    reg [23:0] coord_stall_count;
+    reg [23:0] read_ar_wait_count;
+    reg [23:0] read_response_wait_count;
+    reg [23:0] write_wait_count;
+    wire [23:0] pipeline_diag_miss_count;
+    wire [23:0] pipeline_diag_fill_cycles;
+    wire pipeline_read_response_wait;
 
     wire pipeline_s_valid, pipeline_s_ready, pipeline_m_valid, pipeline_m_ready;
     wire [31:0] pipeline_pixel, pipeline_frame_id;
@@ -145,7 +160,10 @@ module frame_identity_transform_engine #(
         .read_rdata(read_rdata), .read_rlast(read_rlast),
         .reader_idle(reader_idle), .reader_fault(reader_fault),
         .read_error_count(tile_read_errors),
-        .fetched_rows(fetched_rows), .fifo_level(fifo_level)
+         .fetched_rows(fetched_rows), .fifo_level(fifo_level),
+         .diagnostic_miss_count(pipeline_diag_miss_count),
+         .diagnostic_fill_cycles(pipeline_diag_fill_cycles),
+         .read_response_wait(pipeline_read_response_wait)
     );
 
     always @(posedge clk or negedge rstn) begin
@@ -164,6 +182,18 @@ module frame_identity_transform_engine #(
             request_v <= 10'd0;
             response_u <= 11'd0;
             stall_count <= 32'd0;
+            frame_cycle_count <= 24'd0;
+            coord_stall_count <= 24'd0;
+            read_ar_wait_count <= 24'd0;
+            read_response_wait_count <= 24'd0;
+            write_wait_count <= 24'd0;
+            perf_frame_cycles <= 24'd0;
+            perf_coord_stall_cycles <= 24'd0;
+            perf_cache_miss_count <= 24'd0;
+            perf_cache_fill_cycles <= 24'd0;
+            perf_read_ar_wait_cycles <= 24'd0;
+            perf_read_response_wait_cycles <= 24'd0;
+            perf_write_wait_cycles <= 24'd0;
             copy_done <= 1'b0;
             copy_error <= 1'b0;
             fatal_fault <= 1'b0;
@@ -171,6 +201,20 @@ module frame_identity_transform_engine #(
         end else begin
             copy_done <= 1'b0;
             copy_error <= 1'b0;
+            if (state != IDLE && frame_cycle_count != 24'hffffff)
+                frame_cycle_count <= frame_cycle_count + 1'b1;
+            if (state == COLLECT && pipeline_s_valid && !pipeline_s_ready &&
+                coord_stall_count != 24'hffffff)
+                coord_stall_count <= coord_stall_count + 1'b1;
+            if (read_valid && !read_ready && read_ar_wait_count != 24'hffffff)
+                read_ar_wait_count <= read_ar_wait_count + 1'b1;
+            if (pipeline_read_response_wait &&
+                read_response_wait_count != 24'hffffff)
+                read_response_wait_count <= read_response_wait_count + 1'b1;
+            if (((write_awvalid && !write_awready) ||
+                 (write_wvalid && !write_wready)) &&
+                write_wait_count != 24'hffffff)
+                write_wait_count <= write_wait_count + 1'b1;
             if (state == IDLE || progress)
                 stall_count <= 32'd0;
             else if (stall_count != 32'hffffffff)
@@ -193,6 +237,11 @@ module frame_identity_transform_engine #(
                         request_u <= 11'd0;
                         request_v <= 10'd0;
                         response_u <= 11'd0;
+                        frame_cycle_count <= 24'd0;
+                        coord_stall_count <= 24'd0;
+                        read_ar_wait_count <= 24'd0;
+                        read_response_wait_count <= 24'd0;
+                        write_wait_count <= 24'd0;
                         state <= START_FRAME;
                     end else begin
                         fatal_fault <= 1'b1;
@@ -259,6 +308,14 @@ module frame_identity_transform_engine #(
                         returned_pixels == PIXELS_PER_FRAME && reader_idle &&
                         fifo_level == 0) begin
                         copy_done <= 1'b1;
+                        perf_frame_cycles <= (frame_cycle_count == 24'hffffff)
+                            ? frame_cycle_count : frame_cycle_count + 1'b1;
+                        perf_coord_stall_cycles <= coord_stall_count;
+                        perf_cache_miss_count <= pipeline_diag_miss_count;
+                        perf_cache_fill_cycles <= pipeline_diag_fill_cycles;
+                        perf_read_ar_wait_cycles <= read_ar_wait_count;
+                        perf_read_response_wait_cycles <= read_response_wait_count;
+                        perf_write_wait_cycles <= write_wait_count;
                         state <= IDLE;
                     end else begin
                         fatal_fault <= 1'b1;

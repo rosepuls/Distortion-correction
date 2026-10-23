@@ -81,7 +81,9 @@ module pixel_tile_cache #(
     output wire                         fill_data_ready,
     input  wire [255:0]                 fill_data,
     input  wire [1:0]                   fill_data_row_index,
-    input  wire [1:0]                   fill_data_beat_index
+    input  wire [1:0]                   fill_data_beat_index,
+    output reg  [23:0]                  diagnostic_miss_count,
+    output reg  [23:0]                  diagnostic_fill_cycles
 );
     localparam integer WAY_WIDTH = (WAYS <= 1) ? 1 : $clog2(WAYS);
     localparam integer SET_WIDTH = (SET_COUNT <= 1) ? 1 : $clog2(SET_COUNT);
@@ -687,6 +689,8 @@ module pixel_tile_cache #(
             pending_way <= 0;
             pending_set <= 0;
             pending_row <= 0;
+            diagnostic_miss_count <= 24'd0;
+            diagnostic_fill_cycles <= 24'd0;
             invalidate_pending <= 1'b0;
             invalidate_active <= 1'b0;
             invalidate_set <= 0;
@@ -717,6 +721,17 @@ module pixel_tile_cache #(
             // Keep response pixels and bank/slot payloads out of the reset
             // tree; only their validity/state requires initialization.
         end else begin
+            if (invalidate) begin
+                diagnostic_miss_count <= 24'd0;
+                diagnostic_fill_cycles <= 24'd0;
+            end else begin
+                if (start_miss && diagnostic_miss_count != 24'hffffff)
+                    diagnostic_miss_count <= diagnostic_miss_count + 1'b1;
+                if ((start_miss || fill_state != FILL_IDLE || retry_active) &&
+                    diagnostic_fill_cycles != 24'hffffff)
+                    diagnostic_fill_cycles <= diagnostic_fill_cycles + 1'b1;
+            end
+
             // Advance S0 -> S1 decode -> S1 Tag -> S2 summary as one elastic
             // front pipeline.  A held S2 miss stops all four stages, preserving
             // request order without sacrificing one-per-cycle hit flow.

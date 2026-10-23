@@ -20,6 +20,7 @@ module ddr_read_burst_arbiter_tb;
     reg axi_rvalid = 1'b0, axi_rlast = 1'b0;
     reg [3:0] axi_rid = 4'd0;
     wire busy;
+    wire c1_wait_arbiter, c1_wait_arready;
     wire [15:0] response_error_count;
 
     ddr_read_burst_arbiter dut (
@@ -34,7 +35,9 @@ module ddr_read_burst_arbiter_tb;
         .axi_arvalid(axi_arvalid), .axi_arready(axi_arready),
         .axi_rdata(axi_rdata), .axi_rvalid(axi_rvalid), .axi_rlast(axi_rlast),
         .axi_rid(axi_rid),
-        .busy(busy), .response_error_count(response_error_count)
+        .busy(busy), .response_error_count(response_error_count),
+        .c1_wait_arbiter(c1_wait_arbiter),
+        .c1_wait_arready(c1_wait_arready)
     );
 
     task tick;
@@ -63,6 +66,8 @@ module ddr_read_burst_arbiter_tb;
               c1_ready && !c0_ready, "unreserved client cannot issue");
         tick();
         check(busy, "accepted burst owns read return path");
+        check(c1_wait_arbiter && !c1_wait_arready,
+              "client 1 arbitration wait is counted while another burst is active");
         @(negedge clk);
         c1_valid = 1'b0; c0_reserve = 1'b1;
         axi_rid = 4'd1;
@@ -136,6 +141,8 @@ module ddr_read_burst_arbiter_tb;
         #1;
         check(axi_arvalid && axi_araddr == 28'h0002000,
               "first stalled address selected");
+        check(!c1_wait_arbiter && !c1_wait_arready,
+              "client 1 not counted before it has a request");
         tick();
         @(negedge clk);
         c1_valid = 1'b1; c1_reserve = 1'b1;
@@ -144,6 +151,8 @@ module ddr_read_burst_arbiter_tb;
         check(axi_arvalid && axi_araddr == 28'h0002000 &&
               axi_arlen == 4'd3,
               "stalled AR address and length remain stable when competitor arrives");
+        check(c1_wait_arbiter && !c1_wait_arready,
+              "client 1 arbitration wait is distinct from DDR ARREADY wait");
         axi_arready = 1'b1;
         #1;
         check(c0_ready && !c1_ready,
@@ -158,6 +167,16 @@ module ddr_read_burst_arbiter_tb;
         tick();
         check(response_error_count == 3,
               "wrong RID increments protocol error count");
+        @(negedge clk);
+        axi_rid = 4'd0; axi_rvalid = 1'b1; axi_rlast = 1'b1;
+        tick();
+        @(negedge clk);
+        axi_rvalid = 1'b0; axi_rlast = 1'b0;
+        c0_valid = 1'b0; c1_valid = 1'b1; c1_reserve = 1'b1;
+        c1_addr = 28'h0c03000; c1_len = 4'd3; axi_arready = 1'b0;
+        #1;
+        check(axi_arvalid && c1_wait_arready && !c1_wait_arbiter,
+              "selected client 1 distinguishes DDR ARREADY backpressure");
         $display("PASS: ddr_read_burst_arbiter reservation and routing test");
         $finish;
     end

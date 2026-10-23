@@ -1,6 +1,9 @@
 `timescale 1ns / 1ps
 
-module stage6_radial_pipeline_tb;
+module stage6_radial_pipeline_tb #(
+    parameter integer CACHE_SETS = 16,
+    parameter integer CACHE_WAYS = 4
+);
     reg clk = 0;
     always #4 clk = ~clk;
     reg rstn = 0, source_frame_start = 0;
@@ -31,7 +34,8 @@ module stage6_radial_pipeline_tb;
 
     stage5_identity_pipeline #(
         .IMAGE_WIDTH(1280), .IMAGE_HEIGHT(720),
-        .RADIAL_MAPPING(1), .RADIAL_DENOM_SHIFT(21)
+        .RADIAL_MAPPING(1), .RADIAL_DENOM_SHIFT(21),
+        .CACHE_SET_COUNT(CACHE_SETS), .CACHE_WAYS(CACHE_WAYS)
     ) dut (
         .clk(clk), .rstn(rstn),
         .source_frame_start(source_frame_start), .source_frame_slot(2'd0),
