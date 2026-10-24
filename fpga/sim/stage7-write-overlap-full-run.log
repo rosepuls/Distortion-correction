@@ -1,0 +1,77 @@
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/memory/tile_cache_bank_ram.sv" into library work
+INFO: [VRFC 10-311] analyzing module tile_cache_bank_ram
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/memory/pixel_tile_cache.sv" into library work
+INFO: [VRFC 10-311] analyzing module pixel_tile_cache_plru8
+INFO: [VRFC 10-311] analyzing module pixel_tile_cache
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/memory/tile_row_ddr_adapter.sv" into library work
+INFO: [VRFC 10-311] analyzing module tile_row_ddr_adapter
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/memory/cached_neighbor_reader.sv" into library work
+INFO: [VRFC 10-311] analyzing module cached_neighbor_reader
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/correction/identity_mapper.sv" into library work
+INFO: [VRFC 10-311] analyzing module identity_mapper
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/correction/demo_radial_mapper.sv" into library work
+INFO: [VRFC 10-311] analyzing module demo_radial_mapper
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/correction/coordinate_fifo.sv" into library work
+INFO: [VRFC 10-311] analyzing module coordinate_fifo
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/correction/identity_coordinate_pipeline.sv" into library work
+INFO: [VRFC 10-311] analyzing module identity_coordinate_pipeline
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/correction/bilinear_sample_planner.sv" into library work
+INFO: [VRFC 10-311] analyzing module bilinear_sample_planner
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/correction/pipelined_bilinear_interpolator.sv" into library work
+INFO: [VRFC 10-311] analyzing module pipelined_bilinear_interpolator
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/correction/stage5_identity_pipeline.sv" into library work
+INFO: [VRFC 10-311] analyzing module stage5_identity_pipeline
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage7_write_overlap_16x8/source/rtl/memory/frame_identity_transform_engine.sv" into library work
+INFO: [VRFC 10-311] analyzing module frame_identity_transform_engine
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/sim/stage7_write_overlap_tb.sv" into library work
+INFO: [VRFC 10-311] analyzing module stage7_write_overlap_tb
+Vivado Simulator 2020.2
+Copyright 1986-1999, 2001-2020 Xilinx, Inc. All Rights Reserved.
+Running: D:/Xilinx/Vivado/2020.2/bin/unwrapped/win64.o/xelab.exe work.stage7_write_overlap_tb -s stage7_write_overlap_tb_sim --log xelab.log 
+Multi-threading is on. Using 30 slave threads.
+Starting static elaboration
+Pass Through NonSizing Optimizer
+WARNING: [VRFC 10-3645] port 'perf_frame_cycles' remains unconnected for this instance [C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/sim/stage7_write_overlap_tb.sv:50]
+Completed static elaboration
+Starting simulation data flow analysis
+WARNING: [XSIM 43-4328] File: C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/sim/stage7_write_overlap_tb.sv Line: 184 : Sensitivity on input argument "completion_target" of task "run_frame" may never get triggered.
+Completed simulation data flow analysis
+Time Resolution for simulation is 1ps
+Compiling module work.identity_mapper
+Compiling module work.coordinate_fifo(LEVEL_WIDTH=5)
+Compiling module work.identity_coordinate_pipeline(LEV...
+Compiling module work.bilinear_sample_planner
+Compiling module work.tile_cache_bank_ram(BANK_ADDR_WI...
+Compiling module work.pixel_tile_cache(IMAGE_WIDTH=128...
+Compiling module work.tile_row_ddr_adapter_default
+Compiling module work.cached_neighbor_reader(WAYS=8)
+Compiling module work.pipelined_bilinear_interpolator
+Compiling module work.stage5_identity_pipeline(CACHE_W...
+Compiling module work.frame_identity_transform_engine(...
+Compiling module work.stage7_write_overlap_tb
+Built simulation snapshot stage7_write_overlap_tb_sim
+
+****** Webtalk v2020.2 (64-bit)
+  **** SW Build 3064766 on Wed Nov 18 09:12:45 MST 2020
+  **** IP Build 3064653 on Wed Nov 18 14:17:31 MST 2020
+    ** Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+
+source C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/sim/.work/stage7-write-overlap-c6a56408/xsim.dir/stage7_write_overlap_tb_sim/webtalk/xsim_webtalk.tcl -notrace
+INFO: [Common 17-206] Exiting Webtalk at Sat Oct 24 15:00:27 2026...
+
+****** xsim v2020.2 (64-bit)
+  **** SW Build 3064766 on Wed Nov 18 09:12:45 MST 2020
+  **** IP Build 3064653 on Wed Nov 18 14:17:31 MST 2020
+    ** Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
+
+source xsim.dir/stage7_write_overlap_tb_sim/xsim_script.tcl
+# xsim {stage7_write_overlap_tb_sim} -autoloadwcfg -runall
+Vivado Simulator 2020.2
+Time resolution is 1 ps
+run -all
+PASS: full 1280x720 DDR identity frame, cycles=1442345 AR=28800 AW=7200
+$finish called at time : 14423500 ns : File "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/sim/stage7_write_overlap_tb.sv" Line 212
+run: Time (s): cpu = 00:00:00 ; elapsed = 00:00:14 . Memory (MB): peak = 916.723 ; gain = 0.000
+exit
+INFO: [Common 17-206] Exiting xsim at Sat Oct 24 15:00:45 2026...
+PASS: write-overlap behavior verified: C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\fpga\sim\.work\stage7-write-overlap-c6a56408

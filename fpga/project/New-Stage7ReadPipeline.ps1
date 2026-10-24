@@ -1,6 +1,8 @@
 param(
     [string]$SourceProject = (Join-Path $PSScriptRoot 'stage8_read_wait_profile'),
-    [string]$ProjectDirectory = (Join-Path $PSScriptRoot 'stage7_read_pipeline_16x8')
+    [string]$ProjectDirectory = (Join-Path $PSScriptRoot 'stage7_read_pipeline_16x8'),
+    [ValidateSet(16,32)][int]$CacheSets = 16,
+    [ValidateSet(8)][int]$CacheWays = 8
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,7 +28,7 @@ if (-not (Test-Path -LiteralPath $ficSource -PathType Leaf)) {
 # Copy project inputs only; generated build outputs belong to each candidate.
 $excludedDirs = @('compile','synthesize','device_map','place_route','report_timing',
     'generate_bitstream','generate_netlist','constraint_check','report_power',
-    'log','logbackup','.dide')
+    'log','logbackup','.dide','.work')
 $excludedFiles = @('*.log','*.csv','*.sbit','*.smsk','*.bgr','*.vcd','*.lock')
 New-Item -ItemType Directory -Path $destination | Out-Null
 $prefix = $source.TrimEnd('\') + '\'
@@ -70,25 +72,56 @@ foreach ($oldLabel in $labelMap.Keys) {
 [IO.File]::WriteAllText((Join-Path $ficDir $ficName), $fic,
     [Text.UTF8Encoding]::new($false))
 
+$topFile = Join-Path $destination 'source\rtl\fram_buf.v'
+$sourceEncoding = [Text.Encoding]::GetEncoding(28591)
+$topText = [IO.File]::ReadAllText($topFile, $sourceEncoding)
+$cachePattern = '\.CACHE_SET_COUNT\(\d+\),\s*\.CACHE_WAYS\(\d+\)'
+if ([regex]::Matches($topText, $cachePattern).Count -ne 1) {
+    throw 'Expected one cache configuration in fram_buf.v.'
+}
+$topText = [regex]::Replace($topText, $cachePattern,
+    ".CACHE_SET_COUNT($CacheSets), .CACHE_WAYS($CacheWays)")
+[IO.File]::WriteAllText($topFile, $topText, $sourceEncoding)
+
+$tileTestFile = Join-Path $destination 'sim\stage7_tile_fill_tb.sv'
+if (Test-Path -LiteralPath $tileTestFile -PathType Leaf) {
+    $tileTest = [IO.File]::ReadAllText($tileTestFile, [Text.Encoding]::UTF8)
+    $tileTestPattern = 'cached_neighbor_reader\s*#\(\.SET_COUNT\(\d+\),\s*\.WAYS\(\d+\)\)'
+    if ([regex]::Matches($tileTest, $tileTestPattern).Count -ne 1) {
+        throw 'Expected one cache configuration in stage7_tile_fill_tb.sv.'
+    }
+    $tileTest = [regex]::Replace($tileTest, $tileTestPattern,
+        "cached_neighbor_reader #(.SET_COUNT($CacheSets), .WAYS($CacheWays))")
+    [IO.File]::WriteAllText($tileTestFile, $tileTest,
+        [Text.UTF8Encoding]::new($false))
+}
+
 $readme = @'
-# Stage 7 read pipeline experiment (16x8 cache)
+# Stage 7 throughput experiment: <SETS>x<WAYS> cache
 
-Independent throughput candidate based on the Stage 8 read-wait diagnostic
-project. It retains the 16x8 cache and all four DDR read-wait counters. The
-candidate permits up to four transform row bursts for one tile to be outstanding
-and buffers the full 16-beat tile before cache writeback. Display reads retain
-their own AXI ID and one-burst reservation path.
+This candidate is copied from `<SOURCE>`. Its top-level cache has <SETS> sets
+and <WAYS> ways. It retains the source project's DDR read pipeline and JTAG
+counter wiring. Check the source project's README for its implementation details.
 
-Build with `../Run-Stage7ReadPipeline.ps1`. Program this project's `.sbit` and
-import the matching `.fic` from the same build. The FIC bus labels are corrected
-for the Stage 8 diagnostic channel wiring.
+Run the simulations in `sim/`, then build with
+`../Run-Stage7ReadPipeline.ps1 -ProjectDirectory <this directory>`.
+Program only this project's generated `.sbit` and import its matching `.fic`.
+This candidate has no hardware result until routing, timing and board checks pass.
 '@
+$readme = $readme.Replace('<SOURCE>', (Split-Path $source -Leaf)).
+    Replace('<SETS>', [string]$CacheSets).Replace('<WAYS>', [string]$CacheWays)
 [IO.File]::WriteAllText((Join-Path $destination 'README.md'), $readme,
     [Text.UTF8Encoding]::new($false))
 $jtagFile = Join-Path $destination 'README_JTAG.md'
 $jtag = [IO.File]::ReadAllText($jtagFile, [Text.Encoding]::UTF8)
 $jtag = $jtag.Replace('# Stage 8 DDR read wait profile: JTAG channel map',
     '# Stage 7 read pipeline: JTAG channel map')
+$intro = "After a successful build, program this project's generated ``.sbit`` " +
+    "and import its matching ``.fic``. Capture two Listing snapshots about " +
+    '60 seconds apart. Frame counters are cumulative; the 24-bit performance ' +
+    'counters are snapshots from the most recently completed transform.'
+$jtag = [regex]::Replace($jtag, '(?s)(\A#[^\r\n]+\r?\n\r?\n).*?(?=\r?\n\r?\n\| Channels)',
+    { param($match) $match.Groups[1].Value + $intro })
 [IO.File]::WriteAllText($jtagFile, $jtag, [Text.UTF8Encoding]::new($false))
 
 Write-Host "PASS: created Stage 7 read pipeline project at $destination"

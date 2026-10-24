@@ -11,3 +11,5 @@
 `New-Stage5FpsDiagnosticProject.ps1` 可从任意兼容的 DDR 帧处理工程生成配套帧率诊断副本。Stage 6 Brown-Conrady 诊断工程位于 `stage6_radial_fps_debug/`；帧率测试说明见 `docs/results/stage6-radial-fps-diagnostic.md`。
 
 Stage 6 径向帧率诊断可用 `New-Stage6RadialFpsDiagnostic.ps1` 生成、`Run-Stage6RadialFpsDiagnostic.ps1` 构建；必须将该工程同次构建的 `.sbit` 与 `.fic` 配对。
+
+Stage 7 写入重叠的实板处理帧率约为 59.43 fps，输入完整发布在 60 秒窗口比原始 VSYNC 少 37 帧。入口定位诊断位流位于 `stage7_write_overlap_ingress_diag_16x8/`；它记录拒收、中止、采集写排空和采集槽等待。构建结果、SHA-256 和完整 Fabric Debugger 通道表见该目录下的 `README.md` 与 `README_JTAG.md`。

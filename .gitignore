@@ -46,6 +46,9 @@
 /fpga/sim/.work/
 /xsim.dir/
 /xvlog.pb
+/xelab.log
+/xelab.pb
+/xvlog.log
 /.venv/
 /host/calibration/images/
 /host/calibration/output/
