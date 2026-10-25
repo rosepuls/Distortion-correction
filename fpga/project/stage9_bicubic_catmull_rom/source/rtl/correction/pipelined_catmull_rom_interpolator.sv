@@ -2,9 +2,9 @@
 
 // Separable Catmull-Rom RGB interpolation over a row-major 4x4 stencil.
 // Coordinates are Q0.16, weights Q2.14, horizontal sums Q14 and vertical
-// accumulators Q28. Seven elastic stages isolate coordinate squares, cubes,
-// Q16.16 weight formation, weight quantization, horizontal/vertical products,
-// and output rounding.
+// accumulators Q28. Eight elastic stages isolate coordinate squares, cubes,
+// Q16.16 weight formation, weight quantization, horizontal pair products,
+// horizontal pair sums, vertical products, and output rounding.
 module pipelined_catmull_rom_interpolator (
     input  wire         clk,
     input  wire         rstn,
@@ -28,8 +28,9 @@ module pipelined_catmull_rom_interpolator (
     output reg [15:0]   m_param_version,
     output reg          m_sof, m_eol, m_eof
 );
-    reg v0, v1, v2, v3, v4, v5;
-    wire r6 = !m_valid || m_ready;
+    reg v0, v1, v2, v3, v4, v5, v6;
+    wire r7 = !m_valid || m_ready;
+    wire r6 = !v6 || r7;
     wire r5 = !v5 || r6;
     wire r4 = !v4 || r5;
     wire r3 = !v3 || r4;
@@ -42,10 +43,11 @@ module pipelined_catmull_rom_interpolator (
     reg [15:0] fx_0, fy_0, t2x_0, t2y_0;
     reg [15:0] fx_1, fy_1, t2x_1, t2y_1, t3x_1, t3y_1;
     reg [127:0] weights_x_q16_2, weights_y_q16_2;
-    reg [63:0] wx_3, wy_3, wy_4;
-    reg signed [26:0] horizontal_4 [0:11];
-    reg signed [42:0] vertical_product_5 [0:11];
-    reg [87:0] meta_0, meta_1, meta_2, meta_3, meta_4, meta_5;
+    reg [63:0] wx_3, wy_3, wy_4, wy_5;
+    reg [51:0] horizontal_pairs_4 [0:11];
+    reg signed [26:0] horizontal_5 [0:11];
+    reg signed [42:0] vertical_product_6 [0:11];
+    reg [87:0] meta_0, meta_1, meta_2, meta_3, meta_4, meta_5, meta_6;
 
     wire [31:0] fx_square = {16'd0, s_fx} * {16'd0, s_fx};
     wire [31:0] fy_square = {16'd0, s_fy} * {16'd0, s_fy};
@@ -101,16 +103,19 @@ module pipelined_catmull_rom_interpolator (
         end
     endfunction
 
-    function automatic signed [26:0] weighted_four_pixels;
+    function automatic [51:0] weighted_four_pairs;
         input [7:0] p0, p1, p2, p3;
         input signed [15:0] w0, w1, w2, w3;
         reg signed [24:0] product0, product1, product2, product3;
+        reg signed [25:0] pair01, pair23;
         begin
             product0 = $signed({1'b0, p0}) * w0;
             product1 = $signed({1'b0, p1}) * w1;
             product2 = $signed({1'b0, p2}) * w2;
             product3 = $signed({1'b0, p3}) * w3;
-            weighted_four_pixels = product0 + product1 + product2 + product3;
+            pair01 = product0 + product1;
+            pair23 = product2 + product3;
+            weighted_four_pairs = {pair23, pair01};
         end
     endfunction
 
@@ -130,12 +135,12 @@ module pipelined_catmull_rom_interpolator (
         end
     endfunction
 
-    wire signed [44:0] sum_red = vertical_product_5[0] + vertical_product_5[1]
-                                + vertical_product_5[2] + vertical_product_5[3];
-    wire signed [44:0] sum_green = vertical_product_5[4] + vertical_product_5[5]
-                                  + vertical_product_5[6] + vertical_product_5[7];
-    wire signed [44:0] sum_blue = vertical_product_5[8] + vertical_product_5[9]
-                                 + vertical_product_5[10] + vertical_product_5[11];
+    wire signed [44:0] sum_red = vertical_product_6[0] + vertical_product_6[1]
+                                + vertical_product_6[2] + vertical_product_6[3];
+    wire signed [44:0] sum_green = vertical_product_6[4] + vertical_product_6[5]
+                                  + vertical_product_6[6] + vertical_product_6[7];
+    wire signed [44:0] sum_blue = vertical_product_6[8] + vertical_product_6[9]
+                                 + vertical_product_6[10] + vertical_product_6[11];
     wire [7:0] out_red = round_saturate_q28(sum_red);
     wire [7:0] out_green = round_saturate_q28(sum_green);
     wire [7:0] out_blue = round_saturate_q28(sum_blue);
@@ -144,7 +149,7 @@ module pipelined_catmull_rom_interpolator (
     always @(posedge clk) begin
         if (!rstn) begin
             v0 <= 1'b0; v1 <= 1'b0; v2 <= 1'b0; v3 <= 1'b0;
-            v4 <= 1'b0; v5 <= 1'b0;
+            v4 <= 1'b0; v5 <= 1'b0; v6 <= 1'b0;
             m_valid <= 1'b0;
             m_pixel <= 32'd0; m_geometry_valid <= 1'b0;
             m_pixel_id <= 20'd0; m_frame_id <= 32'd0;
@@ -158,9 +163,10 @@ module pipelined_catmull_rom_interpolator (
             t2x_1 <= 16'd0; t2y_1 <= 16'd0;
             t3x_1 <= 16'd0; t3y_1 <= 16'd0;
             weights_x_q16_2 <= 128'd0; weights_y_q16_2 <= 128'd0;
-            wx_3 <= 64'd0; wy_3 <= 64'd0; wy_4 <= 64'd0;
+            wx_3 <= 64'd0; wy_3 <= 64'd0; wy_4 <= 64'd0; wy_5 <= 64'd0;
             meta_0 <= 88'd0; meta_1 <= 88'd0; meta_2 <= 88'd0;
             meta_3 <= 88'd0; meta_4 <= 88'd0; meta_5 <= 88'd0;
+            meta_6 <= 88'd0;
         end else begin
             if (r0) begin
                 v0 <= s_valid;
@@ -207,21 +213,21 @@ module pipelined_catmull_rom_interpolator (
                 v4 <= v3;
                 if (v3) begin
                     for (row_index = 0; row_index < 4; row_index = row_index + 1) begin
-                        horizontal_4[row_index*3] <= weighted_four_pixels(
+                        horizontal_pairs_4[row_index*3] <= weighted_four_pairs(
                             samples_3[(row_index*4+0)*32+24 +: 8],
                             samples_3[(row_index*4+1)*32+24 +: 8],
                             samples_3[(row_index*4+2)*32+24 +: 8],
                             samples_3[(row_index*4+3)*32+24 +: 8],
                             $signed(wx_3[15:0]), $signed(wx_3[31:16]),
                             $signed(wx_3[47:32]), $signed(wx_3[63:48]));
-                        horizontal_4[row_index*3+1] <= weighted_four_pixels(
+                        horizontal_pairs_4[row_index*3+1] <= weighted_four_pairs(
                             samples_3[(row_index*4+0)*32+16 +: 8],
                             samples_3[(row_index*4+1)*32+16 +: 8],
                             samples_3[(row_index*4+2)*32+16 +: 8],
                             samples_3[(row_index*4+3)*32+16 +: 8],
                             $signed(wx_3[15:0]), $signed(wx_3[31:16]),
                             $signed(wx_3[47:32]), $signed(wx_3[63:48]));
-                        horizontal_4[row_index*3+2] <= weighted_four_pixels(
+                        horizontal_pairs_4[row_index*3+2] <= weighted_four_pairs(
                             samples_3[(row_index*4+0)*32+8 +: 8],
                             samples_3[(row_index*4+1)*32+8 +: 8],
                             samples_3[(row_index*4+2)*32+8 +: 8],
@@ -236,24 +242,35 @@ module pipelined_catmull_rom_interpolator (
             if (r5) begin
                 v5 <= v4;
                 if (v4) begin
-                    for (channel_index = 0; channel_index < 3; channel_index = channel_index + 1)
-                        for (row_index = 0; row_index < 4; row_index = row_index + 1)
-                            vertical_product_5[channel_index*4+row_index] <=
-                                horizontal_4[row_index*3+channel_index]
-                                * $signed(wy_4[row_index*16 +: 16]);
+                    for (channel_index = 0; channel_index < 12; channel_index = channel_index + 1)
+                        horizontal_5[channel_index] <=
+                            $signed(horizontal_pairs_4[channel_index][25:0]) +
+                            $signed(horizontal_pairs_4[channel_index][51:26]);
+                    wy_5 <= wy_4;
                     meta_5 <= meta_4;
                 end
             end
             if (r6) begin
-                m_valid <= v5;
+                v6 <= v5;
                 if (v5) begin
-                    m_geometry_valid <= meta_5[87] && (&meta_5[86:71]);
-                    m_pixel <= (meta_5[87] && (&meta_5[86:71]))
+                    for (channel_index = 0; channel_index < 3; channel_index = channel_index + 1)
+                        for (row_index = 0; row_index < 4; row_index = row_index + 1)
+                            vertical_product_6[channel_index*4+row_index] <=
+                                horizontal_5[row_index*3+channel_index]
+                                * $signed(wy_5[row_index*16 +: 16]);
+                    meta_6 <= meta_5;
+                end
+            end
+            if (r7) begin
+                m_valid <= v6;
+                if (v6) begin
+                    m_geometry_valid <= meta_6[87] && (&meta_6[86:71]);
+                    m_pixel <= (meta_6[87] && (&meta_6[86:71]))
                         ? {out_red, out_green, out_blue, 8'h00} : 32'd0;
-                    m_pixel_id <= meta_5[70:51];
-                    m_frame_id <= meta_5[50:19];
-                    m_param_version <= meta_5[18:3];
-                    m_sof <= meta_5[2]; m_eol <= meta_5[1]; m_eof <= meta_5[0];
+                    m_pixel_id <= meta_6[70:51];
+                    m_frame_id <= meta_6[50:19];
+                    m_param_version <= meta_6[18:3];
+                    m_sof <= meta_6[2]; m_eol <= meta_6[1]; m_eof <= meta_6[0];
                 end
             end
         end
