@@ -1,0 +1,181 @@
+`timescale 1ns / 1ps
+
+module cached_bicubic_neighbor_reader_tb;
+    reg clk = 0;
+    always #5 clk = ~clk;
+    reg rstn = 0;
+    reg source_frame_start = 0;
+    reg [1:0] source_frame_slot = 0;
+    reg s_valid = 0;
+    wire s_ready;
+    reg [10:0] s_x0 = 30, s_x1 = 31, s_x2 = 32, s_x3 = 33;
+    reg [9:0] s_y0 = 2, s_y1 = 3, s_y2 = 4, s_y3 = 5;
+    reg [15:0] s_fx = 16'h8000, s_fy = 16'h4000;
+    reg [15:0] s_neighbor_valid = 16'hffff;
+    reg s_geometry_valid = 1;
+    reg [19:0] s_pixel_id = 20'h12345;
+    reg [31:0] s_frame_id = 32'h10203040;
+    reg [15:0] s_param_version = 16'h0055;
+    reg s_sof = 1, s_eol = 0, s_eof = 1;
+    wire m_valid;
+    reg m_ready = 0;
+    wire [511:0] m_samples;
+    wire [15:0] m_fx, m_fy, m_neighbor_valid;
+    wire m_geometry_valid;
+    wire [19:0] m_pixel_id;
+    wire [31:0] m_frame_id;
+    wire [15:0] m_param_version;
+    wire m_sof, m_eol, m_eof;
+    wire read_valid;
+    wire [27:0] read_addr;
+    wire [3:0] read_len;
+    wire read_reserve;
+    reg read_pending = 0;
+    reg [27:0] active_read_addr = 0;
+    reg [1:0] read_beat = 0;
+    wire read_ready = !read_pending;
+    wire read_rvalid = read_pending;
+    reg [255:0] read_rdata;
+    wire read_rlast = (read_beat == 3);
+    wire idle, fatal_fault;
+    wire [15:0] read_error_count;
+    wire [31:0] fetched_rows;
+    wire [23:0] diagnostic_miss_count, diagnostic_fill_cycles;
+    wire read_response_wait, first_beat_wait, interbeat_wait;
+
+    integer lane;
+    integer word_address;
+    integer pixel_x, pixel_y;
+
+    function automatic [31:0] pattern_pixel(input integer x, input integer y);
+        reg [7:0] px, py, pb;
+        begin
+            px = x; py = y; pb = x + y;
+            pattern_pixel = {px, py, pb, 8'h00};
+        end
+    endfunction
+
+    always @* begin
+        for (lane = 0; lane < 8; lane = lane + 1) begin
+            word_address = active_read_addr + (read_beat * 8) + lane;
+            pixel_x = word_address % 64;
+            pixel_y = word_address / 64;
+            read_rdata[lane*32 +: 32] = pattern_pixel(pixel_x, pixel_y);
+        end
+    end
+
+    always @(posedge clk or negedge rstn) begin
+        if (!rstn) begin
+            read_pending <= 0;
+            active_read_addr <= 0;
+            read_beat <= 0;
+        end else if (read_valid && read_ready) begin
+            read_pending <= 1;
+            active_read_addr <= read_addr;
+            read_beat <= 0;
+        end else if (read_pending) begin
+            if (read_beat == 3) begin
+                read_pending <= 0;
+                read_beat <= 0;
+            end else
+                read_beat <= read_beat + 1'b1;
+        end
+    end
+
+    cached_bicubic_neighbor_reader #(
+        .IMAGE_WIDTH(64), .IMAGE_HEIGHT(8), .SET_COUNT(16), .WAYS(4)
+    ) dut (
+        .clk(clk), .rstn(rstn), .source_frame_start(source_frame_start),
+        .source_frame_slot(source_frame_slot), .s_valid(s_valid),
+        .s_ready(s_ready), .s_x0(s_x0), .s_x1(s_x1), .s_x2(s_x2),
+        .s_x3(s_x3), .s_y0(s_y0), .s_y1(s_y1), .s_y2(s_y2), .s_y3(s_y3),
+        .s_fx(s_fx), .s_fy(s_fy), .s_neighbor_valid(s_neighbor_valid),
+        .s_geometry_valid(s_geometry_valid), .s_pixel_id(s_pixel_id),
+        .s_frame_id(s_frame_id), .s_param_version(s_param_version),
+        .s_sof(s_sof), .s_eol(s_eol), .s_eof(s_eof),
+        .m_valid(m_valid), .m_ready(m_ready), .m_samples(m_samples),
+        .m_fx(m_fx), .m_fy(m_fy), .m_neighbor_valid(m_neighbor_valid),
+        .m_geometry_valid(m_geometry_valid), .m_pixel_id(m_pixel_id),
+        .m_frame_id(m_frame_id), .m_param_version(m_param_version),
+        .m_sof(m_sof), .m_eol(m_eol), .m_eof(m_eof),
+        .read_valid(read_valid), .read_addr(read_addr), .read_len(read_len),
+        .read_reserve(read_reserve), .read_ready(read_ready),
+        .read_rvalid(read_rvalid), .read_rdata(read_rdata),
+        .read_rlast(read_rlast), .idle(idle), .fatal_fault(fatal_fault),
+        .read_error_count(read_error_count), .fetched_rows(fetched_rows),
+        .diagnostic_miss_count(diagnostic_miss_count),
+        .diagnostic_fill_cycles(diagnostic_fill_cycles),
+        .read_response_wait(read_response_wait),
+        .first_beat_wait(first_beat_wait), .interbeat_wait(interbeat_wait)
+    );
+
+    task automatic send_request(input geometry, input [19:0] id);
+        begin
+            @(negedge clk);
+            while (!s_ready) @(negedge clk);
+            s_geometry_valid = geometry;
+            s_neighbor_valid = geometry ? 16'hffff : 16'h0000;
+            s_pixel_id = id;
+            s_frame_id = 32'h10203040 + id;
+            s_valid = 1;
+            @(posedge clk); #1;
+            @(negedge clk); s_valid = 0;
+        end
+    endtask
+
+    task automatic wait_for_response(input integer limit);
+        integer cycles;
+        begin
+            cycles = 0;
+            while (!m_valid && cycles < limit) begin
+                @(posedge clk); #1;
+                cycles = cycles + 1;
+            end
+            if (!m_valid) $fatal(1, "Timed out waiting for 4x4 cache response");
+        end
+    endtask
+
+    integer row, col;
+    integer x, y;
+    initial begin
+        repeat (4) @(negedge clk);
+        rstn = 1;
+        @(negedge clk); source_frame_start = 1; source_frame_slot = 0;
+        @(negedge clk); source_frame_start = 0;
+        repeat (3) @(negedge clk);
+
+        send_request(1, 20'h12345);
+        wait_for_response(5000);
+        if (m_fx !== 16'h8000 || m_fy !== 16'h4000 ||
+            m_neighbor_valid !== 16'hffff || !m_geometry_valid ||
+            m_pixel_id !== 20'h12345 || m_frame_id !== 32'h10215385 ||
+            m_param_version !== 16'h0055 || !m_sof || m_eol || !m_eof)
+            $fatal(1, "4x4 reader response metadata mismatch");
+        for (row = 0; row < 4; row = row + 1)
+            for (col = 0; col < 4; col = col + 1) begin
+                x = 30 + col;
+                y = 2 + row;
+                if (m_samples[(row*4+col)*32 +: 32] !== pattern_pixel(x, y))
+                    $fatal(1, "4x4 sample mismatch at row %0d col %0d", row, col);
+            end
+        repeat (3) begin
+            @(posedge clk); #1;
+            if (!m_valid || m_pixel_id !== 20'h12345 ||
+                m_samples[31:0] !== pattern_pixel(30, 2))
+                $fatal(1, "Reader response changed under output backpressure");
+        end
+        @(negedge clk); m_ready = 1;
+        @(posedge clk); #1;
+        if (m_valid) $fatal(1, "Reader did not retire accepted response");
+
+        @(negedge clk); m_ready = 0;
+        send_request(0, 20'h54321);
+        wait_for_response(8);
+        if (m_geometry_valid || m_neighbor_valid !== 16'h0000 ||
+            m_samples !== 512'd0 || m_pixel_id !== 20'h54321)
+            $fatal(1, "Invalid border sample was not returned as black");
+
+        $display("PASS: Stage 9 cached 4x4 neighbor gather across tile boundaries");
+        $finish;
+    end
+endmodule
