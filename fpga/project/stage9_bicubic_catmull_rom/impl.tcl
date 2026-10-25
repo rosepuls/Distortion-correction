@@ -259,3 +259,5 @@ dev_map
 pnr 
 report_timing 
 report_power 
+gen_netlist 
+gen_bit_stream -master_configuration_clock_frequency {40M} 
