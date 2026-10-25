@@ -1,6 +1,6 @@
 # 上位机工具
 
-`calibration/` 保存棋盘格制作和相机标定工具；`reference/` 保存 OpenCV 同参数矫正、有效区域掩码和 RGBX8888 字格式导出工具。当前没有工业相机的真实标定照片，因此没有真实内参或矫正效果可报告。
+`calibration/` 保存棋盘格制作和相机标定工具；`reference/` 保存 OpenCV 同参数矫正、有效区域掩码和 RGBX8888 字格式导出工具；`pose/` 保存合成画面旋转与平面单应参考、零位姿态登记和运行时棋盘格姿态跟踪工具。当前没有工业相机的真实标定照片，因此没有真实内参或矫正效果可报告。
 
 ## 1. 安装上位机依赖
 
@@ -52,3 +52,7 @@ python host\calibration\make_checkerboard_svg.py --cols 9 --rows 6 --square-mm 2
 输出 `undistorted.png`、`valid_mask.png` 和 `reference.json`；可选的 `undistorted_rgbx.mem` 每行一个 32 位数值字 `RRGGBB00`。掩码只标记四邻域均落在输入图内的像素，其他输出像素为黑色。默认输出相机矩阵与输入矩阵相同，匹配旧 FPGA 核心的单套内参接口；`--output-matrix optimal --alpha 1` 可另外生成扩大视野的参考，但需扩展 FPGA 接口后才能与之直接比较。OpenCV 的 `INTER_LINEAR` 图像是浮点模型的软件基准；随后仍需对 FPGA 的定点舍入、字节序和边界策略单独比对。
 
 原始图像和生成结果目录已在 `.gitignore` 中排除。保留这些数据以便复现，但提交或共享前由数据持有人决定是否公开。
+
+## 5. 上位机角度估计
+
+相机标定完成后，按 [`pose/README.md`](pose/README.md) 先登记参考零位，再运行 UVC 棋盘格姿态跟踪。跟踪器使用标定 JSON 解算当前相对姿态，并输出 JSON Lines，供离线检查和后续 UART 协议适配。它不矫正演示视频，也不直接控制 FPGA；UART 参数格式需与 FPGA 侧帧边界寄存器接口一起确定。

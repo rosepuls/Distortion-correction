@@ -1,32 +1,32 @@
-# Camera Calibration and Dynamic Pose Measurement Plan
+# 相机标定与动态姿态测量计划
 
-> Status: planning. Camera calibration images have not yet been collected. The printed target is available at `picture/标定板_9x6内角点_25mm_A4横向.pdf`.
+> 状态：规划中。尚未采集相机标定图像。已准备好打印标定板：`picture/标定板_9x6内角点_25mm_A4横向.pdf`。
 
-## Goal
+## 目标
 
-Calibrate the UVC industrial camera at its final 1280×720 mode, establish a repeatable zero pose, and have the PC estimate camera pose from the UVC image and send only pose parameters to the FPGA. The PC will not geometrically correct the demonstration video; the FPGA remains responsible for coordinate mapping, DDR tile reads, and interpolation.
+在最终使用的 1280×720 模式下标定 UVC 工业相机，建立可重复的零位姿，并由上位机根据 UVC 图像估计相机姿态，再仅将姿态参数发送给 FPGA。上位机不对演示视频进行几何校正；坐标映射、DDR 分块读取和插值仍由 FPGA 完成。
 
-## Current Setup and Fixed Conventions
+## 当前设备与固定约定
 
-- Camera: Jierui Weitong DCXGW10, advertised as 720p60 with a 2.1 mm wide-angle lens and 150–210° field of view. Treat the advertised field of view as a product claim; use calibration results to select the camera model.
-- Calibration target: 9×6 inner chessboard corners, 25 mm square edges, A4 landscape. The board contains 10×7 squares and measures 250×175 mm.
-- Print at A4, landscape, 100% / actual size. Disable fit-to-page and measure the printed square edge. Use the measured edge if it differs from 25 mm.
-- Capture original UVC frames at 1280×720. Keep lens, focus, resolution, and camera mode fixed throughout calibration and pose testing. Do not use screenshots of the Windows desktop or FPGA-corrected output.
-- Existing scripts: `host/calibration/calibrate.py`, `host/calibration/export_fixed_parameters.py`, and `host/reference/render_reference.py`.
+- 相机：Jierui Weitong DCXGW10，标称 720p60，配备 2.1 mm 广角镜头，视场角标称为 150–210°。将标称视场角视为产品参数，使用标定结果选择相机模型。
+- 标定板：9×6 个棋盘格内角点，方格边长 25 mm，A4 横向打印。棋盘格为 10×7 个方格，整体尺寸为 250×175 mm。
+- 使用 A4 横向、100% / 实际尺寸打印。关闭“适合页面”等缩放选项，并测量打印后的方格边长；若测量值与 25 mm 不同，则使用实测值。
+- 以 1280×720 分辨率采集原始 UVC 图像。整个标定和姿态测试期间固定镜头、焦距、分辨率和相机模式。不要使用 Windows 桌面截图或 FPGA 校正后的输出图像。
+- 现有脚本：`host/calibration/calibrate.py`、`host/calibration/export_fixed_parameters.py` 和 `host/reference/render_reference.py`。
 
-## Phase 1: Capture Calibration Images
+## 阶段 1：采集标定图像
 
-1. In OBS, add the UVC camera as a **Video Capture Device** and set 1280×720 at 60 fps.
-2. Save each frame using **Screenshot (Source)** for the camera source. Do not use Screenshot (Preview), which can include canvas transforms or overlays.
-3. Collect 25–30 sharp, non-duplicate views; at least 20 must be accepted by the calibration script. Move the board through the image center, corners, and edges, and vary its tilt and distance. Keep it flat, well lit, and fully visible where practical.
-4. Save the PNGs in `host/calibration/images/`. Record the camera model, lens, focus state, UVC mode, and measured square size.
-5. Also save one clear image in the intended initial camera pose. This image will define pose zero later; it can also be part of the intrinsic-calibration set.
+1. 在 OBS 中添加 UVC 相机作为 **视频采集设备（Video Capture Device）**，设置分辨率为 1280×720、帧率为 60 fps。
+2. 使用相机源的 **截图（源）（Screenshot (Source)）** 保存每帧。不要使用“截图（预览）（Screenshot (Preview)）”，以免包含画布变换或叠加层。
+3. 采集 25–30 张清晰且不重复的图像；标定脚本至少要接受其中 20 张。让标定板覆盖画面中心、角落和边缘，并改变倾斜角度和距离。尽量保持标定板平整、光线充足且完整可见。
+4. 将 PNG 图像保存到 `host/calibration/images/`。记录相机型号、镜头、焦距状态、UVC 模式和方格实测尺寸。
+5. 另存一张清晰的预期初始相机位姿图像，作为后续的零位姿参考；也可以将这张图纳入内参标定图像集。
 
-**Deliverable:** original 1280×720 images, capture notes, and a designated zero-pose image.
+**交付物：**原始 1280×720 图像、采集记录，以及指定的零位姿图像。
 
-## Phase 2: Estimate Intrinsics and Lens Distortion
+## 阶段 2：估计相机内参与镜头畸变
 
-From the `Distortion-correction` directory, run the existing calibration command:
+在 `Distortion-correction` 目录下运行现有标定命令：
 
 ```powershell
 .\.venv\Scripts\python.exe host\calibration\calibrate.py `
@@ -37,45 +37,156 @@ From the `Distortion-correction` directory, run the existing calibration command
   --lens-notes "2.1 mm; record actual focus and UVC settings"
 ```
 
-The script checks resolution and chessboard detection, requires at least 20 accepted views by default, and writes `calibration.json` with the camera matrix, Brown–Conrady coefficients, per-view reprojection errors, and the estimated effect of setting `k3` to zero.
+脚本会检查分辨率和棋盘格检测结果，默认要求至少接受 20 张图像，并生成 `calibration.json`，其中包含相机矩阵、Brown–Conrady 畸变系数、逐图重投影误差，以及将 `k3` 设为零时的估计影响。
 
-Review rejected images and residuals before exporting FPGA parameters. The lens is advertised as an extreme wide-angle / fisheye lens, so do not assume the standard pinhole Brown model is adequate. If residuals show a systematic edge error, compare an OpenCV fisheye calibration and its reference maps before choosing the model. The current FPGA Brown mapper supports `k1/k2/p1/p2`; use the existing export guard for `k3`, and extend the FPGA model if the measured `k3` effect exceeds the project threshold.
+导出 FPGA 参数前，应先检查被拒绝的图像和残差。该镜头标称为超广角／鱼眼镜头，因此不要预设标准针孔 Brown 模型一定适用。若残差显示边缘存在系统性误差，应将 OpenCV 鱼眼标定及其参考映射与当前模型进行比较，再决定使用哪种模型。目前 FPGA 的 Brown 映射器支持 `k1/k2/p1/p2`；对于 `k3`，使用现有导出检查机制。如果实测 `k3` 的影响超过项目阈值，则扩展 FPGA 模型。
 
-**Deliverable:** a reproducible calibration JSON and a written model-fit decision. Do not hand-tune coefficients to make the image look straighter.
+**交付物：**可复现的标定 JSON 文件，以及关于模型拟合效果的书面判断。不要为了让图像看起来更直而手动调系数。
 
-## Phase 3: Define and Measure the Reference Pose
+## 阶段 3：定义并测量参考位姿
 
-1. Fix the calibration board in the scene and rigidly mount the camera on the adjustable bracket.
-2. Set the camera to the desired neutral view, capture a clear board image, and mark that pose as zero. Store the board corner layout and the calibration profile used for this reference.
-3. For each later UVC frame, detect the board corners and estimate board-to-camera pose using the saved camera calibration. Compute pose change relative to the saved zero pose; do not recalibrate intrinsics per frame.
-4. First test discrete movements at 0°, ±10°, and ±20°. Record the requested physical angle from the bracket scale and the PC-estimated pose. A printed protractor on the bracket can provide a ground-truth check for the pitch axis.
-5. Chessboard corner ordering can become ambiguous after large rotations or detection loss. If pose jumps by roughly 180°, add an asymmetric orientation marker at a measured, fixed location or use a ChArUco/ArUco board for runtime pose tracking.
+1. 将标定板固定在场景中，并把相机刚性安装在可调支架上。
+2. 将相机调整到期望的中性视角，拍摄清晰的标定板图像，并将该位姿定义为零位姿。保存标定板角点布局和该参考位姿使用的标定配置。
+3. 对后续每一帧 UVC 图像，检测标定板角点，并使用已保存的相机标定结果估计标定板相对于相机的位姿。相对于已保存的零位姿计算位姿变化；不要逐帧重新标定内参。
+4. 先测试 0°、±10° 和 ±20° 的离散运动，记录支架刻度给出的实际角度和上位机估计的姿态。可在支架上贴打印的量角器，为俯仰轴提供真实角度参考。
+5. 大幅旋转或检测丢失后，棋盘格角点排序可能产生歧义。如果姿态突然跳变约 180°，应在固定且已测量的位置增加非对称方向标记，或使用 ChArUco/ArUco 标定板进行运行时姿态跟踪。
 
-For this planar target, estimate pose or a board-plane homography. A single global homography can rectify the board plane; it cannot remove parallax across a general 3D scene when the camera translates.
+对于这个平面标定目标，可估计位姿或标定板平面单应矩阵。单个全局单应矩阵可以校正标定板所在平面；当相机发生平移时，它无法消除一般三维场景中的视差。
 
-**Deliverable:** zero-pose record, repeatable pose estimates, and comparison against the bracket angle at each test position.
+**交付物：**零位姿记录、可重复的姿态估计结果，以及各测试位置与支架角度的对比。
 
-## Phase 4: Send Pose to FPGA
+## 阶段 4：将姿态发送给 FPGA
 
-1. Keep UVC capture and display pass-through on the PC. Run board detection and pose estimation on the PC, then send a compact angle or inverse mapping matrix over UART.
-2. Define a packet with protocol version, sequence number, transform parameters, validity flag, and CRC. Reject incomplete or out-of-range packets.
-3. FPGA stores active and pending parameter banks. Validate the complete packet first, then switch the full parameter set atomically at a frame boundary so a frame cannot mix two poses.
-4. Apply the inverse pose transform before the existing lens-distortion source mapping, then retain the current DDR tile-cache fetch and bilinear interpolation path. The PC must not remap the displayed video.
-5. Initially move the camera slowly through discrete angles and log the source frame time, pose packet sequence, FPGA parameter version, output frame rate, dropped frames, crop, and invalid-pixel area. Add timestamp/frame association if pose lag is visible.
+1. UVC 采集和显示直通由上位机完成。上位机运行标定板检测与姿态估计，再通过 UART 发送精简角度参数或逆映射矩阵。
+2. 定义数据包，包含协议版本、序列号、变换参数、有效标志和 CRC。拒绝不完整或超出范围的数据包。
+3. FPGA 保存活动参数组和待更新参数组。先验证完整数据包，再在帧边界原子切换整组参数，避免同一帧混用两个位姿。
+4. 在现有镜头畸变源坐标映射之前应用逆位姿变换，然后继续使用当前 DDR 分块缓存读取和双线性插值链路。上位机不得重映射显示视频。
+5. 初期让相机缓慢经过各离散角度，并记录源图像时间、姿态数据包序列号、FPGA 参数版本、输出帧率、丢帧数、裁剪区域和无效像素面积。如果发现姿态滞后，再增加时间戳／帧关联机制。
 
-## Acceptance Criteria
+## 验收标准
 
-- At least 20 valid calibration views at exactly 1280×720; saved JSON identifies the camera, board dimensions, model, and per-view residuals.
-- The zero pose can be restored and produces the same transform after recapturing the reference view.
-- The PC estimates changing pose from the fixed target and sends parameters without applying geometric correction to the demonstration video.
-- FPGA changes parameters only at a frame boundary and produces the expected correction at 0°, ±10°, and ±20°.
-- Report actual new-frame rate, visible crop / invalid region, coordinate or line-straightness error, and behavior when the board is temporarily undetected. Do not claim 60 fps for angle changes until measured on the board.
+- 在严格的 1280×720 分辨率下，至少有 20 张有效标定图像；保存的 JSON 标明相机、标定板尺寸、模型和逐图残差。
+- 恢复零位姿后重新采集参考图像，得到的变换应保持一致。
+- 上位机能根据固定标定板估计姿态变化并发送参数，且不会对演示视频应用几何校正。
+- FPGA 只在帧边界更改参数，并能在 0°、±10° 和 ±20° 下产生预期校正效果。
+- 报告实测新帧率、可见裁剪／无效区域、坐标误差或直线度误差，以及标定板暂时未检测到时的行为。未经上板测量，不得宣称角度变化时仍达到 60 fps。
 
-## Recommended Execution Order
+## 建议执行顺序
 
-1. Print and measure the chessboard.
-2. Capture and review the calibration image set.
-3. Run calibration and decide whether Brown–Conrady is adequate for this lens.
-4. Capture and store the zero pose; verify PC pose estimates against the bracket scale.
-5. Define the UART packet and frame-boundary update in the FPGA.
-6. Test FPGA correction at increasing angles and measure throughput and image quality.
+1. 打印并测量棋盘格。
+2. 采集并检查标定图像集。
+3. 运行标定，判断 Brown–Conrady 模型是否适用于该镜头。
+4. 采集并保存零位姿；将上位机姿态估计与支架刻度进行对比验证。
+5. 定义 UART 数据包和 FPGA 帧边界更新机制。
+6. 逐步增加角度测试 FPGA 校正，并测量吞吐率和图像质量。
+
+## 相机标定前的开发工作（2026-10-24）
+
+即使尚未采集真实标定图像，也可以继续进行软件开发。上位机代码目前按职责组织：
+
+```text
+host/
+  calibration/  内参与镜头标定
+  reference/    镜头校正软件参考实现
+  pose/         图像旋转参考实现与标定板姿态跟踪
+```
+
+`host/pose/render_rotation_reference.py` 提供了第一个不依赖相机的开发步骤。不指定输入图像时，脚本会生成一张合成的 1280×720 棋盘格，并渲染画面内可见旋转角度为 `0°`、`±10°` 和 `±20°` 的图像。每个角度都会保存图像、有效性掩码（仅当四个双线性采样源邻点都在图像范围内时才有效），以及输出到源坐标的齐次矩阵，矩阵保存在 `rotation_reference.json` 中。正角度表示显示图像逆时针旋转；像素坐标的 x 轴向右、y 轴向下。可在仓库根目录运行：
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\render_rotation_reference.py --out host\pose\output
+```
+
+也可以通过 `--input` 指定采集图像或合成图像作为输入；该脚本不需要相机标定 JSON。2026-10-24 使用生成的棋盘图完成运行和目视检查。正角度逆时针旋转，负角度向相反方向旋转，棋盘中心保持在所选图像中心。有效性掩码统计如下：
+
+| 显示旋转角度 | 四邻点均有效的像素数 | 无效像素数 | 无效像素占比 |
+| ---: | ---: | ---: | ---: |
+| 0° | 919,601 | 1,999 | 0.22% |
+| +10° / -10° | 839,082 | 82,518 | 8.95% |
+| +20° / -20° | 777,514 | 144,086 | 15.63% |
+
+在 0° 时，1,999 个无效像素位于最后一行和最后一列：当前参考实现要求四个双线性源邻点都处于图像范围内，即使对应小数权重为零也不例外。非零角度下，更大的无效区域是旋转后的源图像覆盖范围超出了固定的 1280×720 输出区域。生成图像、掩码和精确矩阵位于被忽略的 `host/pose/output/` 目录中；运行元数据文件为 `rotation_reference.json`。
+
+仅旋转与合成平面单应参考实现，以及相对位姿系数导出工具均已完成。FPGA 角度校正工作现位于独立的 Stage 8 工程中。后续工作如下：
+
+1. 将 Stage 8 已连接的单应映射和小数精度 Brown RTL 与上位机整数模型及全帧参考结果进行验证。
+2. 定义 UART 数据包与校验器，连接 Stage 8 帧边界参数组，再测量新增周期和最差帧吞吐率。当前 Stage 7 实测约为 60 个新帧／秒，但单帧时序余量约为 11%，低于暂定的 25% 余量目标。
+3. 获得相机标定图像后，替换合成内参、登记零位姿，并用已知支架角度验证姿态跟踪；之后再基于实测姿态数据评估上板校正效果。
+
+零位姿采集和运行时跟踪命令记录在 [`host/pose/README.md`](../../host/pose/README.md) 中。FPGA 参数接口定义完成前，暂不实现 UART 发送。
+
+### 合成平面单应参考实现（2026-10-24）
+
+下一步不依赖标定数据的工作已在 `host/pose/render_homography_reference.py` 中实现。该脚本使用合成理想针孔相机（`fx=fy=900 px`，主点位于 1280×720 图像中心）、1000 mm 参考平面距离和已知标定板倾角。脚本计算平面输出到源坐标的单应矩阵，并通过逆向采样渲染当前视图。运行时不需要标定图像或真实相机测量数据：
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\render_homography_reference.py --out host\pose\output
+```
+
+2026-10-24 的运行生成了 X 轴和 Y 轴在 `0°`、`±10°` 和 `±20°` 下的用例。图像和有效性掩码已通过目视检查。严格掩码要求双线性采样的四个源邻点都位于图像范围内：
+
+| 倾斜轴 | 角度 | 有效像素 | 无效像素 |
+| --- | ---: | ---: | ---: |
+| X | 0° | 919,601 | 1,999 |
+| X | ±10° | 882,590 | 39,010 |
+| X | ±20° | 860,872 | 60,728 |
+| Y | 0° | 919,601 | 1,999 |
+| Y | ±10° | 852,572 | 69,028 |
+| Y | ±20° | 809,794 | 111,806 |
+
+生成用例位于被忽略的 `host/pose/output/` 目录中；`homography_reference.json` 记录了每个单应矩阵、位姿和有效像素数。非零倾角时，无效区域来自投影到固定输出画面之外的源平面。零倾角时，按当前四邻点规则，图像最后一行和最后一列仍被视为无效。这些结果仅验证脚本的合成坐标链路和裁剪统计；镜头畸变、实测姿态精度、FPGA 定点行为以及完整三维场景中的视差仍未验证。
+
+### 相对位姿与候选定点系数（2026-10-24）
+
+`host/pose/export_pose_homography.py` 现在可读取 `track_pose.py` 生成的 JSONL 文件，以及与其匹配的标定文件和零位姿文件。在这些文件尚不存在时，脚本会生成已知的合成相对位姿。脚本通过 `R_delta = R_current R_reference^T` 和 `t_delta = t_current - R_delta t_reference` 重建当前标定板位姿，再使用零位姿所在的标定板平面计算理想的平面输出到源坐标单应矩阵。无效输入位姿会生成不含系数的无效输出记录。
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\export_pose_homography.py `
+  --analyze-maps --out host\pose\output\pose_homography.jsonl
+```
+
+矩阵前两行使用候选有符号 Q16.16 系数；分母行使用有符号 Q2.30 系数。传给现有双线性规划器的源坐标为有符号 Q16.16。该格式目前只是软件候选方案；FPGA 累加器／除法器位宽和舍入规则尚未确定。合成运行导出了全部 10 个有效位姿，每种情况下的矩阵和浮点有效像素数都与此前的直接单应参考实现一致。对全帧坐标映射进行系数量化和 Q16.16 输出舍入后，与浮点结果相比，有效像素的最大单轴误差为 **0.0129 px**；10 帧的有效性掩码共差异 **21 个像素**（单帧最多 9 个），差异出现在源图像边界处。该结果仅适用于合成针孔几何和软件量化，不代表 FPGA 时序或逐位一致的硬件运算结果。
+
+### Stage 8 数值与帧边界设计（2026-10-24）
+
+所有新增 FPGA 角度校正工作都位于 [`fpga/project/stage8_angle_correction`](../../fpga/project/stage8_angle_correction/README.md)。该工程从已提交的 Stage 7 源码和厂商 IP 基线复制而来；没有使用本地修改过的 Stage 7 `data.wf` 和生成的构建输出作为种子。Stage 7 保留用于吞吐率对比。参数组及针对性仿真先完成，坐标链路随后于 2026-10-24 接入，详见下文。
+
+数值规范记录在 [`docs/plan/2026-10-24-stage8-angle-mapping.md`](../plan/2026-10-24-stage8-angle-mapping.md)。首个候选方案使用 44 位有符号分子／分母累加器、1024 项倒数种子表、一次牛顿迭代，以及有符号 Q16.16 输出坐标。上位机整数模型在 10 种合成 X/Y 倾斜用例下均可运行；相对于浮点几何，有效像素坐标的最大误差为 **0.0148 px**，四邻点有效性掩码总差异为 **20 个像素**。零角度用例结果完全一致。这是数值模型结果，并非 FPGA 布线时序或真实相机精度结果。
+
+Stage 8 参数组包含活动和待更新两组各 9 个系数。完整数据包通过接收后会先暂存；只有在被接受的输出帧起始处，活动参数组才会切换。如果数据包明确标记位姿无效，则会暂存单位系数，并在下一帧清除位姿有效标志。参数组仿真已通过复位单位变换、待更新参数替换、帧边界提交、同时提交与新参数加载、版本号和无效位姿等场景。克隆 Stage 8 工程的 PDS 仅编译运行也已完成，并识别到参数组源码。在任何外部数据包接入参数组之前，仍需实现 UART 解析、CRC 检查和数值范围验证。UART 数据流缺失时的超时策略也尚待确定。
+
+**当前后续步骤：**坐标链路已经接入 RTL，接下来应完成 UART 接收器及数据校验、整帧 DDR 数据通路的上板验证，并测量吞吐率、裁剪和输出图像质量。真实相机标定完成后，再替换合成内参并测量姿态精度。目前生成的静态 sbit 仍将数据包输入固定为低电平，不支持动态角度更新。
+
+### Stage 8 坐标链路已接入 RTL（2026-10-24）
+
+Stage 8 视频通路现在选择新的坐标链路。对于每个输出像素，`homography_mapper.sv` 使用当前活动的 9 个单应系数，计算理想当前视图的 Q16.16 源坐标。该模块使用指定的 1024 项倒数种子表、一次牛顿迭代、有符号输出舍入，以及可停顿的单像素每时钟流水线。随后，`fractional_brown_mapper.sv` 对该小数坐标应用与 Stage 7 相同的 **试验值** `k1/k2/p1/p2`。DDR 分块缓存和双线性插值器仍作为采样通路。Stage 7 源码及其本地修改过的 `data.wf` 均未改动。
+
+Stage 8 模式下，规划器要求所有四个源邻点都有效；无效采样点输出黑色。帧引擎实例化了活动／待更新参数组，在被接受的输出帧起始处提交参数，并在首次坐标请求前锁存已提交的版本；黑边像素不再导致整帧致命错误。当前顶层将数据包输入固定为低电平，因此复位后的单位单应变换始终生效，暂时无法在开发板上演示角度变化。现有 Brown 系数仍是视觉试验值；在宣称镜头校正精度前必须完成真实标定。
+
+已连接的链路通过了 Vivado Simulator 2020.2 仿真，覆盖单位变换、整数和半像素偏移、不支持的参数范围、元数据以及 ready/valid 停顿。另一项测试使用 10 种合成 X/Y 位姿的 60 个坐标，将 Stage 8 两个映射器的输出与上位机整数模型逐位比较，结果一致。PDS 2022.2-SP6.4 已完成 Stage 8 链路的布线并生成满足全部约束的 bitstream。这些结果**不能**证明硬件上完整 DDR 帧通路、开发板吞吐率或真实相机图像质量已通过验证。顶层的数据包输入仍固定为低电平，因此当前 bitstream 运行的是单位单应变换加试验 Brown 映射。在支持上位机动态姿态更新并进行有意义的角度校正时序测量前，必须用带 CRC 检查和数值配置验证的 UART 接收器驱动该接口。
+
+### Stage 8 时序优化（2026-10-24）
+
+在独立的 Stage 8 工程中缩短了三个继承自旧工程的数据通路瓶颈：缓存会在较早的命中事务完成后对替换元数据进行快照，再根据快照选择牺牲项；双线性插值器在垂直方向乘积与最终求和之间增加了一个弹性流水级；显示适配器则直接比较已提交的占用量与突发预留阈值。插值器通过将位 `[39:32]` 加上位 31 来计算舍入后的输出字节，等价于原先执行 42 位加 `2^31` 后再取该位段的做法。
+
+Vivado Simulator 2020.2 验证了输出停顿情况下与参考结果一致的 100 笔插值器事务、显示适配器信用额度／突发／帧测试，以及五帧 1280×720 缓存回放。缓存回放与模型中的 41,145 个有序未命中和牺牲项事件全部匹配（每帧 8,229 次未命中）。
+
+PDS 综合时序裕量逐步改善：缓存牺牲项选择路径从 **-2.055 ns** 改善到插值器路径的 **-0.363 ns**，再到显示信用额度计算路径的 **-0.133 ns**。最新综合报告列出的最差违例为规划器 EOF/EOL/帧元数据到缓存 RAM 输入路径上的 **-0.006 ns**；Brown 映射器路径为 **+0.042 ns**。报告估算完整顶层使用 23,365 个 LUT 和 12,035 个 FF。角度映射器约使用 303 个 LUT／660 个 FF，Brown 映射器约使用 666 个 LUT／2,007 个 FF；但数据包输入仍固定为低电平，因此这些数据未必代表动态单应参数生效时的资源情况。布线后，125 MHz `ddrphy_sysclk` 的建立时间 WNS 为 **+0.228 ns**，保持时间 WHS 为 **+0.103 ns**，违例端点为零。这些结果不能证明开发板上的吞吐率或真实相机图像质量。
+
+### Stage 8 已生成 bitstream（2026-10-24）
+
+`Build-AngleCorrection.ps1` 已完成 Fabric Debugger 核心插入、布局布线、布线后时序分析和 bitstream 生成。报告显示 `Design Summary : All Constraints Met.`。生成的 bitstream 大小为 9,188,552 字节，文件为 [`HDMI_IN_DDR3_HDMI_OUT_top.sbit`](../../fpga/project/stage8_angle_correction/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit)，SHA-256 为 `BD29230F6845FF5D7A3BB6E9D4E7CB2058AA4DDAFC047CE476DD01C8FE945BBB`。对应的 256 通道 Fabric Debugger 文件为 [`HDMI_IN_DDR3_HDMI_OUT_top.fic`](../../fpga/project/stage8_angle_correction/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.fic)，SHA-256 为 `D1FDB7592A3BCF4979C8B4B0A9596ACB6E865D5F23BA1F6EF994263379A90DF7`。
+
+该 bitstream 可用于 Stage 8 静态视频通路上板验证。由于顶层数据包输入固定为低电平，动态角度校正仍未启用；实际板上功能和吞吐率仍需测量。
+
+## 视频流确认正常后的下一步（2026-10-25）
+
+根据本轮上板反馈，视频流运行正常。接下来进入动态参数链路验证；相机标定图像尚未准备好也不影响这一步，可以先使用已有的合成单应参数。
+
+1. 实现 UART 接收器和数据包校验，检查协议版本、序列号、参数范围与 CRC，并确定数据流超时策略。无效、残缺或超时的数据不得更新活动参数。
+2. 将通过校验的单应参数写入 Stage 8 待更新参数组，并在输出帧边界提交，确保单帧只使用同一版本的参数。
+3. 先发送单位变换，确认画面稳定；再发送合成的 ±10°、±20° 参数，验证 FPGA 校正结果并与上位机参考图对比。
+4. 在开发板上测量输出帧率、裁剪范围和无效像素，再评估图像质量。此阶段结果用于验证动态链路，不代表真实相机标定精度。
+5. 相机标定完成后，用实测内参和姿态替换合成参数，再验证真实场景下的校正效果。
+
+**当前建议的第一项工作：**实现 UART 接收、CRC／范围校验和帧边界参数更新。完成后再依次进行单位变换与合成角度的上板测试。
