@@ -165,7 +165,7 @@ module fram_buf #(
     wire write_source_busy, write_protocol_fault;
     wire [15:0] capture_outstanding /* synthesis PAP_MARK_DEBUG="true" */;
     wire [15:0] write_protocol_error_count /* synthesis PAP_MARK_DEBUG="true" */;
-    wire [15:0] capture_dropped_count;
+    wire [15:0] capture_dropped_count /* synthesis PAP_MARK_DEBUG="true" */;
     wire [15:0] output_dropped_count /* synthesis PAP_MARK_DEBUG="true" */;
     wire [15:0] drain_wait_cycles;
     wire input_frame_end, input_frame_complete;
@@ -177,9 +177,9 @@ module fram_buf #(
     wire [31:0] copy_error_count /* synthesis PAP_MARK_DEBUG="true" */;
     wire [15:0] perf_error_flags;
     wire copy_active, copy_wait_input, copy_wait_output;
-    reg [31:0] input_published_count;
-    reg [31:0] display_take_count;
-    reg [15:0] raw_input_vsync_count;
+    reg [31:0] input_published_count /* synthesis PAP_MARK_DEBUG="true" */;
+    reg [31:0] display_take_count /* synthesis PAP_MARK_DEBUG="true" */;
+    reg [15:0] raw_input_vsync_count /* synthesis PAP_MARK_DEBUG="true" */;
     reg [15:0] capture_rejected_count /* synthesis PAP_MARK_DEBUG="true" */;
     reg [15:0] capture_abort_count /* synthesis PAP_MARK_DEBUG="true" */;
     reg [23:0] copy_frame_cycles_max;

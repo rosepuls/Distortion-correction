@@ -54,19 +54,18 @@ if ($channels.Count -ne 256) {
     throw "Expected 256 Fabric Debugger channels, found $($channels.Count)"
 }
 foreach ($signal in @(
+        'fram_buf/raw_input_vsync_count',
+        'fram_buf/input_published_count',
         'fram_buf/copied_count',
-        'fram_buf/copy_engine/pipeline/coordinates/angle_and_brown_mapping.lens/total_y8',
-        'fram_buf/copy_engine/pipeline/coordinates/angle_and_brown_mapping.lens/debug_y8_pixel_id',
-        'fram_buf/copy_engine/pipeline/coordinates/angle_and_brown_mapping.lens/dy0',
-        'fram_buf/copy_engine/pipeline/coordinates/angle_and_brown_mapping.lens/debug_mapped_pixel_id',
-        'fram_buf/copy_engine/pipeline/coordinates/angle_and_brown_mapping.lens/y10',
-        'fram_buf/copy_engine/pipeline/coordinates/angle_and_brown_mapping.lens/debug_y10_pixel_id',
-        'fram_buf/copy_engine/pipeline/coordinates/angle_and_brown_mapping.lens/correction_y10',
-        'fram_buf/copy_engine/pipeline/coordinates/angle_and_brown_mapping.lens/mapped_y11',
-        'fram_buf/copy_engine/pipeline/coord_pixel_id',
-        'fram_buf/copy_engine/pipeline/coord_geometry_valid',
-        'fram_buf/copy_engine/pipeline/plan_geometry_valid',
-        'fram_buf/copy_engine/pipeline/coordinates/angle_and_brown_mapping.lens/geometry11')) {
+        'fram_buf/display_take_count',
+        'fram_buf/capture_dropped_count',
+        'fram_buf/output_dropped_count',
+        'fram_buf/capture_rejected_count',
+        'fram_buf/capture_abort_count',
+        'fram_buf/incomplete_output_count',
+        'fram_buf/copy_error_count',
+        'fram_buf/perf_frame_cycles',
+        'fram_buf/perf_coord_stall_cycles')) {
     if (-not ($ficLines | Where-Object { $_ -like "*=$signal" })) {
         throw "Missing diagnostic FIC bus: $signal"
     }

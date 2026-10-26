@@ -1,21 +1,32 @@
-# Stage 8 Brown Y 坐标探针
+# Stage 8 帧率与掉帧计数探针
 
-`generate_bitstream/` 中的 `.sbit` 与 `.fic` 应成对导入。像素 ID 为 `y * 1280 + x`；Q16.16 坐标值除以 65536 得到像素值。各级流水线按对应的 `debug_*_pixel_id` 对齐，不能直接比较同一 Listing 行的不同级。
+本 FIC 将 256 个触发通道用于帧计数和处理负载诊断。需要重新运行 PDS 并生成新 `.sbit` 后，使用 `generate_bitstream/` 内同一构建生成的 `.fic`；旧 sbit 与此版 FIC 不匹配。
 
-| 通道 | 信号 | 含义 |
+## 通道表
+
+| 通道 | 信号 | 用途 |
 |---|---|---|
-| 0–11 | `fram_buf/copied_count[11:0]` | 完成帧计数低位 |
-| 12–43 | `.../lens/total_y8[31:0]` | Brown 归一化 Y 位移 |
-| 44–63 | `.../lens/debug_y8_pixel_id[19:0]` | `total_y8` 对应目标像素 ID |
-| 64–96 | `.../lens/dy0[32:0]` | 原始 Y 减主点 `cy` |
-| 97–116 | `.../lens/debug_mapped_pixel_id[19:0]` | `mapped_y11` 对应目标像素 ID |
-| 117–148 | `.../lens/y10[31:0]` | 映射加法前的原始 Y |
-| 149–168 | `.../lens/debug_y10_pixel_id[19:0]` | `y10`、`correction_y10` 对应目标像素 ID |
-| 169–200 | `.../lens/correction_y10[31:0]` | 恢复符号后的 Y 校正量 |
-| 201–232 | `.../lens/mapped_y11[31:0]` | Brown 最终 Y 坐标 |
-| 233–252 | `.../coord_pixel_id[19:0]` | 坐标 FIFO 输出像素 ID |
-| 253 | `.../coord_geometry_valid` | 最终坐标有效 |
-| 254 | `.../plan_geometry_valid` | 边界规划有效 |
-| 255 | `.../lens/geometry11` | Brown 结果有效 |
+| 0–15 | `fram_buf/raw_input_vsync_count[15:0]` | 原始输入 VSYNC 帧数，16 位回绕 |
+| 16–47 | `fram_buf/input_published_count[31:0]` | 成功发布到输入帧池的帧数，饱和计数 |
+| 48–79 | `fram_buf/copied_count[31:0]` | 成功处理完成的帧数，饱和计数 |
+| 80–111 | `fram_buf/display_take_count[31:0]` | 显示侧取用输出帧数，饱和计数 |
+| 112–127 | `fram_buf/capture_dropped_count[15:0]` | 输入帧池 ready 队列溢出/丢弃计数 |
+| 128–143 | `fram_buf/output_dropped_count[15:0]` | 输出帧池 ready 队列溢出/丢弃计数 |
+| 144–159 | `fram_buf/capture_rejected_count[15:0]` | 输入帧因无法接纳而拒绝的计数 |
+| 160–175 | `fram_buf/capture_abort_count[15:0]` | 输入采集被中止的计数 |
+| 176–191 | `fram_buf/incomplete_output_count[15:0]` | 输出 VSYNC 到来时前一帧仍不完整的次数 |
+| 192–207 | `fram_buf/copy_error_count[15:0]` | 处理错误计数低 16 位 |
+| 208–231 | `fram_buf/perf_frame_cycles[23:0]` | 最近完成帧的处理周期数；超过 24 位范围会饱和 |
+| 232–255 | `fram_buf/perf_coord_stall_cycles[23:0]` | 最近完成帧的坐标等待周期数；超过范围会饱和 |
 
-目标像素 `0x8F076` 是 `x=886,y=457`。先在其附近触发，再分别用 `debug_y8_pixel_id` 和 `debug_y10_pixel_id` 查找同一像素；对 `total_y8` 按 `FY_Q16` 计算应有的校正量，检查 `correction_y10`。随后以 `debug_mapped_pixel_id` 查 `mapped_y11`，并用 `coord_pixel_id` 核对规划结果。完整层级路径和每一位的通道定义见 `debug_core.fic`。
+## 测量帧率
+
+在 Fabric Debugger 中记录一次计数快照，等待已知时长后再次运行并记录。平均帧率按 `Δ帧数 / Δ秒` 计算：
+
+- 输入到达速率：`raw_input_vsync_count` 或 `input_published_count`
+- 图像处理完成速率：`copied_count`
+- 显示取帧速率：`display_take_count`
+
+`raw_input_vsync_count`、`capture_rejected_count` 和 `capture_abort_count` 是 16 位回绕计数，差值按 65536 取模。ready 丢弃计数和 `incomplete_output_count` 在 `0xFFFF` 饱和；饱和前比较增量，饱和后只能判断曾发生很多次，不能继续统计增量。32 位帧计数在 `0xFFFFFFFF` 饱和。建议用 30–60 秒窗口，并确保用于帧率的计数没有达到饱和值。Fabric Debugger 单次 512 深度采样本身覆盖时间很短，帧率应通过两个有时间标记的快照求平均，不能直接把单次 Listing 行频率当作 FPS。
+
+比较 `input_published_count`、`copied_count`、`display_take_count` 的窗口增量可区分输入接纳、处理完成和显示取用哪一段开始落后。再看 drop/reject/abort/incomplete 计数是否增长；`perf_frame_cycles` 与 `perf_coord_stall_cycles` 可判断最近完成帧的耗时及坐标等待占比。若这几项错误计数均不增长但处理帧率仍下降，下一步需增加更细的 DDR/cache 分阶段周期探针。

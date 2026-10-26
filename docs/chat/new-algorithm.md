@@ -108,3 +108,61 @@ RTL 直接显示，`cached_bicubic_neighbor_reader` 每接收一个有效像素�
 | `HDMI_IN_DDR3_HDMI_OUT_top.fic` | 35,349 | `3F9B42B979A82E6BF3F255D5DD3D1AA7480078B1200BE5278A5A9C88E2E7B6C3` |
 
 输出 FIC 与同次综合输入 FIC 的 SHA-256 一致。上述仿真和时序证明 RTL 数值与工程构建条件；**尚未实板烧录复测**，因此黑区是否消失、图像几何是否满足最终效果仍需上板确认。若仍黑，优先按探针表对齐 `0x8F076` 附近的 `total_y8`、`correction_y10`、`mapped_y11` 以及 `plan_geometry_valid`。
+
+### FIC 帧率诊断映射更新
+
+用户发现长时间运行时出现掉帧，要求保留坐标修复后能观察帧率。因此将工程 FIC 的 256 个通道改映射为原始输入 VSYNC、输入发布、成功处理、显示取帧计数，各类丢帧/拒绝/中止/不完整帧计数，以及最近完成帧的总处理周期和坐标等待周期。相关计数器增加 `PAP_MARK_DEBUG` 标记，构建脚本的探针校验也改为检查新计数映射；通道说明和测量方法见工程的 [`README_JTAG.md`](../../fpga/project/stage8_brown_y_mul_fix_test/README_JTAG.md)。
+
+FIC 配置更新后，2026-10-26 19:38 已按用户要求重新运行完整 PDS 流程。布局布线成功，时序报告为 `All Constraints Met`；最紧的 `ddrphy_sysclk` setup WNS 为 +0.048 ns、TNS 为 0。新 `.sbit` 与 `.fic` 已输出到工程 `generate_bitstream/`，并与同次综合输入 FIC 哈希一致。此次构建信息和长时间运行计数快照见下节。
+
+### Stage 8 半小时运行后的帧率观测（2026-10-26）
+
+用户在系统已连续运行约半小时后，用刚生成的匹配 `.sbit/.fic` 采集两次 Fabric Debugger Listing。控制台显示两次触发时间为 19:41:40 和 19:42:46，相隔 66 秒。计数器快照如下：
+
+| 计数器 | 19:41:40 | 19:42:46 | 增量 |
+|---|---:|---:|---:|
+| 原始输入 VSYNC（16 位回绕） | `0x0a7d` (2,685) | `0x19f4` (6,644) | 3,959 |
+| 输入帧发布 | `0x00000a7c` (2,684) | `0x000019f3` (6,643) | 3,959 |
+| 处理完成 | `0x00000a7b` (2,683) | `0x000019f2` (6,642) | 3,959 |
+| 显示取用新帧 | `0x00000a7a` (2,682) | `0x000019f1` (6,641) | 3,959 |
+| 输入帧池 ready 丢弃 | `0x0000` | `0x0000` | 0 |
+| 输出帧池 ready 丢弃 | `0x0000` | `0x0000` | 0 |
+| 输入采集拒绝 | `0x0000` | `0x0000` | 0 |
+| 输入采集中止 | `0x0001` | `0x0001` | 0 |
+| 输出不完整帧 | `0x0000` | `0x0000` | 0 |
+| Copy 错误 | `0x0000` | `0x0000` | 0 |
+
+66 秒窗口平均帧率为 `3,959 / 66 = 59.985 fps`。输入发布、处理完成和显示取用的增量完全相同；对应的累计计数保持固定一帧的流水延迟。所有丢帧、拒绝、不完整帧和 copy 错误计数在窗口内均未增加；采集中止计数虽为 1，但两次快照之间没有增加。因此这组长时间运行后的观测**没有发现掉帧，实测平均输入及处理/显示新帧速率约为 60 fps，且在该 66 秒采样窗口内稳定**。
+
+这只能证明半小时运行后的这段 66 秒窗口，不等于对整个半小时逐帧监测，也不能排除窗口外短暂异常。`perf_frame_cycles` 从 `0x190387`（1,642,375）到 `0x191322`（1,643,298），相差 923 周期；`perf_coord_stall_cycles` 从 `0x0af2dc`（717,532）到 `0x0b0277`（721,527）。两者是最近完成帧的周期快照，不是窗口累计帧数；按 DDR 时钟 125 MHz 换算，总处理约 13.14 ms/帧、坐标等待约 5.74–5.77 ms/帧。总处理周期远低于 16.67 ms 的 60 fps 帧间隔，与帧计数差分结果相符。
+
+本次配套构建文件（2026-10-26 19:38:41）：
+
+| 文件 | 大小 | SHA-256 |
+|---|---:|---|
+| `generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit` | 9,188,552 字节 | `7B62A657724C895A108658A7C24357A439BE366DF81E96AF74C0066B76AFF58D` |
+| `generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.fic` | 21,960 字节 | `74E38632034EE6933DE019013A432E820BA20912D95E097B4E0A2F938997228C` |
+
+时序报告：[`HDMI_IN_DDR3_HDMI_OUT_top.rtr`](../../fpga/project/stage8_brown_y_mul_fix_test/report_timing/HDMI_IN_DDR3_HDMI_OUT_top.rtr)。本次 sbit 哈希：`7B62A657724C895A108658A7C24357A439BE366DF81E96AF74C0066B76AFF58D`；FIC 与综合输入 FIC 的哈希均为 `74E38632034EE6933DE019013A432E820BA20912D95E097B4E0A2F938997228C`。
+
+
+## Stage 9 Brown 修复测试工程最新时序复核（2026-10-26 17:43）
+
+本次确认的最新独立测试工程是 `stage9_bicubic_catmull_rom_brown_fix_test`，不是 Stage 9 主工程。其 2026-10-26 17:41 布线后报告为 `Design Summary : All Constraints Met.`。这次结果只更新 Brown 修复测试副本的状态；Stage 9 主工程 08:58 的报告另见[结果记录](../results/stage9-bicubic-catmull-rom.md)。
+
+| 项目 | 最新结果 |
+|---|---:|
+| `ddrphy_sysclk` 目标频率 | 125 MHz |
+| 估算频率／周期 | 125.2505 MHz／7.984 ns |
+| Setup WNS／TNS | +0.016 ns／0 |
+| Setup 失败端点 | 0 / 63,956 |
+| Hold WHS／THS | +0.140 ns／0 |
+| Hold 失败端点 | 0 / 63,956 |
+| `.sbit` 大小 | 9,188,552 字节 |
+| `.sbit` SHA-256 | `3C73F21353550C56C3E8357A00E355B421794A313CE17F79192CE7A4216EAA99` |
+| `.fic` 大小 | 22,433 字节 |
+| `.fic` SHA-256 | `31EA1CB5CDA0B2FB33D737C6BFB78A926433F7516EB37497A649295606209803` |
+
+该测试工程的完整 PDS 流程已生成配套 `.sbit/.fic`，FIC 与同次综合输入 FIC 哈希一致。setup 裕量仅 +0.016 ns；约束通过不代表实板图像或吞吐率已经验证。Stage 9 顶层 UART 仍只接收字节，角度参数输入仍固定为低电平；动态角度数据包解析和帧边界更新尚未接通。
+
+证据文件：`fpga/project/stage9_bicubic_catmull_rom_brown_fix_test/report_timing/HDMI_IN_DDR3_HDMI_OUT_top.rtr`、`run.log`、`generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit` 和 `generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.fic`。详细 Stage 9 主工程历史见[结果记录](../results/stage9-bicubic-catmull-rom.md)，Brown 修复副本构建说明见[工程 README](../../fpga/project/stage9_bicubic_catmull_rom_brown_fix_test/README.md)。

@@ -79,3 +79,17 @@ FIC 与同次综合的 256 通道 FIC 哈希一致。随后加入的编译期双
 ## 板上帧率
 
 尚未获得用户对新位流的板上测量。进行板上测量时，必须使用同一次构建的 Stage 9 `.sbit/.fic`，并依据 `README_JTAG.md` 中的帧周期计数器测量。Stage 8 的 FIC 不适用于读取 Stage 9 计数器。
+
+### Stage 9 主工程 UART RX 版构建结果（2026-10-26 08:58）
+
+Stage 9 主工程于 2026-10-26 重新完成 PDS 完整流程，布线后报告为 `Design Summary : All Constraints Met.`。`ddrphy_sysclk` 的目标频率为 125 MHz，估算频率为 **127.0810 MHz**，估算周期为 **7.869 ns**，时序裕量为 **+0.131 ns**。Setup WNS 为 **+0.131 ns**、TNS 为 **0**、失败端点 **0/63,190**；Hold WHS 为 **+0.103 ns**、THS 为 **0**、失败端点 **0/63,190**。报告列出的其他时钟域也没有 setup 或 hold 失败端点。这是 `stage9_bicubic_catmull_rom` 主工程的结果，不是标定 Brown 修复测试副本的结果。
+
+同次流程已完成 bitstream 生成，输出 `.sbit` 大小为 9,188,552 字节，SHA-256 为 `700BDD80DE20AC2FA52928AD27FF8BF280EC79EE238362E5CA39C15DF4AC9189`。本次 Stage 9 `generate_bitstream/` 目录中未找到 `.fic`，因此目前只能确认时序通过且 `.sbit` 已生成；用于板上计数器测量的同次构建 `.sbit/.fic` 配对仍需由正式构建脚本生成并核对。
+
+本结果更新了该主工程 2026-10-25 11:24 UART RX 版构建记录中的 **-0.179 ns** setup 违例。Stage 9 默认仍为 Catmull–Rom 双三次配置。时序通过不代表动态角度参数已经接通，也不代表板上吞吐率已通过测量；顶层参数包解析和动态角度更新仍需单独确认。
+
+### Stage 9 标定 Brown 修复测试工程最新构建（2026-10-26 17:43）
+
+当前最新的独立测试工程是 [`stage9_bicubic_catmull_rom_brown_fix_test`](../../fpga/project/stage9_bicubic_catmull_rom_brown_fix_test/README.md)。该工程在 Stage 9 Catmull–Rom 插值链路上应用标定 Brown 映射和负 Y 定点乘法修复。2026-10-26 17:41 的布线后报告为 `Design Summary : All Constraints Met.`。`ddrphy_sysclk` 目标为 125 MHz，估算频率 **125.2505 MHz**、估算周期 **7.984 ns**、裕量 **+0.016 ns**；Setup WNS **+0.016 ns**、TNS **0**、失败端点 **0/63,956**；Hold WHS **+0.140 ns**、THS **0**、失败端点 **0/63,956**。
+
+该工程完整 PDS 流程已生成配套 `.sbit/.fic`：`.sbit` 为 9,188,552 字节、SHA-256 `3C73F21353550C56C3E8357A00E355B421794A313CE17F79192CE7A4216EAA99`；`.fic` 为 22,433 字节、SHA-256 `31EA1CB5CDA0B2FB33D737C6BFB78A926433F7516EB37497A649295606209803`。这组文件属于 Brown 修复测试工程，应配对用于后续板测。虽然约束全部通过，最差 setup 裕量仅 **0.016 ns**；是否恢复预期图像及实际吞吐率仍需上板验证，动态角度数据包也仍未接入顶层。

@@ -24,13 +24,13 @@ Brown 定向测试覆盖旧板端黑区对应的负 Y 校正值；坐标链测�
 
 旧 Stage 9 工程的时序、位流和 FIC 均不适用于本副本。新工程是否能在实板获得预期双三次画面，需用本工程生成的 `.sbit` 与 `.fic` 实测确认。
 
-## 本次构建结果（2026-10-26）
+## 最新构建结果（2026-10-26 17:43）
 
-默认 Catmull–Rom 模式完整 PDS 构建通过，Fabric Debugger 256 通道插入成功，布线后报告 `All Constraints Met`。125 MHz `ddrphy_sysclk` setup WNS 为 **+0.016 ns**、TNS 为 0、失败端点为 0。该裕量很小，修改 RTL 或工程设置后必须重新跑完整时序。
+默认 Catmull–Rom 模式完整 PDS 构建通过，Fabric Debugger 256 通道插入成功，布线后报告 `All Constraints Met`。125 MHz `ddrphy_sysclk` 估算频率为 **125.2505 MHz**、估算周期为 **7.984 ns**；setup WNS 为 **+0.016 ns**、TNS 为 0、失败端点为 0/63,956；hold WHS 为 **+0.140 ns**、THS 为 0、失败端点为 0/63,956。setup 裕量很小，修改 RTL 或工程设置后必须重新跑完整时序。
 
 | 生成文件 | 字节 | SHA-256 |
 |---|---:|---|
 | `generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit` | 9,188,552 | `3C73F21353550C56C3E8357A00E355B421794A313CE17F79192CE7A4216EAA99` |
 | `generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.fic` | 22,433 | `31EA1CB5CDA0B2FB33D737C6BFB78A926433F7516EB37497A649295606209803` |
 
-输出 FIC 与本次综合输入 FIC 的 SHA-256 一致。定向 Brown 仿真、Stage 8 坐标链与 60 组参考向量、Stage 9 双三次及双线性 64×8 帧仿真均通过。当前还没有新 Stage 9 位流的实板图像和帧率结果。
+本次生成的 FIC 与同次综合输入 FIC 的 SHA-256 一致。定向 Brown 仿真、Stage 8 坐标链与 60 组参考向量、Stage 9 双三次及双线性 64×8 帧仿真均通过。当前还没有新 Stage 9 位流的实板图像和帧率结果。

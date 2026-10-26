@@ -80,10 +80,13 @@ to read Stage 9 counters. See [README_JTAG.md](README_JTAG.md) for channel
 definitions and [the Stage 9 results record](../../../docs/results/stage9-bicubic-catmull-rom.md)
 for verified build data and later board measurements.
 
-The previous UART-enabled full build produced a bitstream but its DDR PHY
-setup timing failed by 0.179 ns. That bitstream predates the interpolation
-selection in this source tree. Rebuild and inspect the new timing report
-before using a newly selected mode on hardware.
+The base Stage 9 project completed a full PDS run on 2026-10-26 08:58 with
+`All Constraints Met` (+0.131 ns setup and +0.103 ns hold slack on the
+125 MHz `ddrphy_sysclk`). This supersedes the earlier -0.179 ns setup result
+for this base project. The later independent calibrated-Brown test project is
+[`stage9_bicubic_catmull_rom_brown_fix_test`](../stage9_bicubic_catmull_rom_brown_fix_test/README.md);
+its timing and matching `.sbit/.fic` are recorded separately. The base
+project's current `generate_bitstream/` output has no matching `.fic`.
 
 Top-level angle packet inputs remain tied low, as in the Stage 8 starting
 project. Dynamic angle packets are not part of this interpolation experiment.
