@@ -1,6 +1,42 @@
 # 相机标定与动态姿态测量计划
 
-> 状态：规划中。尚未采集相机标定图像。已准备好打印标定板：`picture/标定板_9x6内角点_25mm_A4横向.pdf`。
+> 当前权威参数（2026-10-27）：真实相机内参/畸变已标定，平行像平面旋转已根据 `picture/Calibration/parallel angle` 的 19 张图像重新测量。后续对话与实现必须优先使用 [合并参数包](../../host/calibration/parameter_bundle_2026-10-27/README.md) 中的 `camera_rotation_parameters.json`；旧标定快照及旧旋转系数仅作历史记录，不能作为当前参数。
+
+## 当前权威标定与像平面旋转参数（2026-10-27）
+
+合并参数文件：[camera_rotation_parameters.json](../../host/calibration/parameter_bundle_2026-10-27/camera_rotation_parameters.json)。相机标定源文件为 `host/calibration/output/calibration.json`，旋转测量由 `host/pose/analyze_parallel_rotation.py` 对 `0.png` 至 `180.png` 共 19 张图像计算，参考图为 `0.png`。
+
+当前相机矩阵和 Brown-Conrady 畸变系数如下；畸变顺序为 `k1, k2, p1, p2, k3`：
+
+```text
+K = [[850.175409482678, 0, 603.272746879560],
+     [0, 853.854869616763, 353.863063182304],
+     [0, 0, 1]]
+D = [-0.414772866708, +0.241503289014, +0.001323712337,
+     +0.000099120097, -0.088951121362]
+图像尺寸 = 1280 × 720
+标定 RMS = 0.516535 px（全网格基线 RMS = 0.470797 px）
+```
+
+各文件名角度对应的实测相对像平面角度如下。完整浮点矩阵、定点系数行、288-bit 配置字及板面诊断均以 JSON 为准：
+
+| 图像 | 实测相对角度（度） | 图像 | 实测相对角度（度） |
+|---|---:|---|---:|
+| `0.png` | 0.000 | `100.png` | -107.120 |
+| `10.png` | -8.384 | `110.png` | -115.623 |
+| `20.png` | -15.576 | `120.png` | -124.728 |
+| `30.png` | -27.960 | `130.png` | -136.492 |
+| `40.png` | -40.247 | `140.png` | -143.562 |
+| `50.png` | -50.912 | `150.png` | -151.349 |
+| `60.png` | -65.176 | `160.png` | -159.161 |
+| `70.png` | -68.799 | `170.png` | -168.601 |
+| `80.png` | -81.817 | `180.png` | -180.504 |
+| `90.png` | -90.530 |  |  |
+
+角度是根据去畸变后的棋盘长轴图像方向测得，并相对 `0.png` 展开 180° 歧义；负号表示棋盘 x 轴在图像中逆时针移动。矩阵用于从参考图输出理想像素映射到当前图像源理想像素，绕标定主点 `(603.2727469, 353.8630632)` 旋转。每张图除旋转外还存在平移、缩放或透视变化，因此该旋转矩阵只表示纯像平面旋转分量，不是完整板面配准单应矩阵。
+
+**旧角度系数已废止：**不得用早期假设角度、旧的角度斜率/偏置或旧的单张测试系数替代以上逐图实测数据；需要复现时，使用合并 JSON 中对应图像的 `homography_output_to_source_float` 或 `stage8_fixed_coefficients`。历史段落如列出旧参数，均仅保留作追溯。
+
 
 ## 目标
 
@@ -191,7 +227,10 @@ PDS 综合时序裕量逐步改善：缓存牺牲项选择路径从 **-2.055 ns*
 
 **当前建议的第一项工作：**实现 UART 接收、CRC／范围校验和帧边界参数更新。完成后再依次进行单位变换与合成角度的上板测试。
 
-## 2026-10-25 标定图复核与 Stage 9 参数候选
+## 2026-10-25 标定图复核与 Stage 9 参数候选（历史快照，已被 2026-10-27 参数包取代）
+
+> 本节记录当时的临时标定结果。其 K/D 数值及任何旋转候选均已被本文顶部的 2026-10-27 权威参数包替代；后续实现不得从本节复制参数。
+
 
 重新检查 `../../../picture/Calibration/` 后，共有 57 张 PNG，分辨率均为 1280×720。按当前 `calibrate.py` 使用的 9×6 内角点检测器，28 张被接受、29 张因未检测到完整内角点阵列而拒绝，已达到至少 20 张有效图的数量要求。`00.png` 的整块棋盘均可检测，可作为用户指定的零位参考图；零位仅表示相对于该图定义，并不要求它是光学上绝对无倾斜的姿态。
 
@@ -225,3 +264,46 @@ D = [k1=-0.4173938, k2=+0.2550259, p1=-0.00120436,
 标定板应在棋盘格角点检测区域之外增加固定的非对称箭头或 ArUco 标记，以消除对称棋盘格约 180° 的朝向歧义。可先拍 `0°、±5°、±10°、±15°、±20°`，每个角度重复拍摄，并在序列末尾回到 `0°` 检查重复性。记录实际转台／量角器读数、图像文件名和相机设置；不要只记录预设角度。
 
 这批数据用于验证**标定板所在平面**的旋转检测和校正，适合作为角度校正算法的简单起步数据。它不能代替相机真实滚转时对整幅场景的验证：转动标定板不会让背景和其他深度的物体一起旋转。因此后续仍需固定标定板和场景、让相机绕光轴转动，再做整幅画面的最终验证。
+
+### 板载 USB-UART 收发验证（2026-10-27）
+
+已在独立工程 [`stage8_brown_y_uart_echo_test`](../../fpga/project/stage8_brown_y_uart_echo_test/README.md) 中验证盘古 200Pro+ 板载 CP2102 USB-UART 与 FPGA 的物理收发链路。串口助手使用 COM7、115200 baud、8-N-1、无流控；发送十六进制 `55` 后，用户确认 LED3 翻转，表明 FPGA 收到了有效 UART 字节。当前测试顶层还将收到的字节原样回传电脑。
+
+排查过程中修正了 UART 管脚：本板硬件手册 `MES2L676-200HP硬件使用手册_v1.2.pdf` 的 3.2.5 节及配套 `2_8_uart_test` 例程均指定 FPGA_UART_RXD 为 **B24**、FPGA_UART_TXD 为 **C24**。此前误用 P14/K19，导致接收无响应；P14 并非板载 UART_RX。最终测试位流 [`uart_echo_test_top.sbit`](../../fpga/project/stage8_brown_y_uart_echo_test/generate_bitstream/uart_echo_test_top.sbit) 的 SHA-256 为 `0673E98A089133E9EE9317680C819AFA6A65A68F8224EE56F6E2CBDD2D6AFAA2`。C19（LED2）约每 0.5 秒翻转一次作为心跳，E18（LED3）在每个有效接收字节时翻转。
+
+此结果只确认了 CP2102、板级管脚和 UART 回显 RTL 的硬件收发；Stage 8 动态参数包解析、CRC／范围检查及帧边界参数更新仍未接入此独立测试顶层，也尚未因此完成验证。
+
+### Stage 8 UART 参数包协议实板验证（2026-10-27）
+
+随后将该独立测试工程扩展为 Stage 8 参数包接口测试。**本节更新前述“尚未接入参数包解析”的状态**：当前独立测试顶层已包含 UART 接收、固定长度帧解析、CRC／字段／系数范围检查、响应发送，并连接项目内 `homography_parameter_bank`；主 Stage 8 视频工程仍未接入此协议模块。
+
+协议固定使用 45 字节帧：同步字 `A5 5A`、版本 `01`、请求类型 `01`／响应类型 `81`、小端 16 位序号（也作为参数版本）、flags／状态、9 个按 row-major 排列的小端 32 位系数，以及 CRC-16/CCITT-FALSE。CRC 覆盖偏移 2–42，参数为 poly `0x1021`、init `0xFFFF`、无反射、xorout `0x0000`。前两行系数采用有符号 Q16.16，末行采用有符号 Q2.30；`h22` 固定为 `0x40000000`。位姿有效时检查 1280×720 四角处的分子和分母范围。无效位姿帧会暂存单位矩阵并清除位姿有效标志。完整响应回显序号和原始系数，并报告接受／拒绝状态；主机按 stop-and-wait 方式发送。
+
+板上仍使用 COM7、115200、8-N-1、无流控，FPGA UART RX/TX 管脚为 B24/C24。用户发送单位矩阵请求后，FPGA 实际回传 45 字节响应，头部为 `A5 5A 01 81 01 00 00`（状态 `00`，接受）；响应 CRC 为 `10 63`，独立复算一致。此前响应状态 `04` 是因为测试帧生成脚本输出了错误 CRC `18 2D`，而不是 FPGA 拒收逻辑故障。组帧脚本已修正，当前默认单位矩阵帧 CRC 为 `B8 58`，并加入标准 CRC-16/CCITT-FALSE 已知向量 `123456789 -> 29 B1` 自检。正确帧可用工程内 [`Build-UartPacket.ps1`](../../fpga/project/stage8_brown_y_uart_echo_test/sim/Build-UartPacket.ps1) 生成。
+
+解析器的 CRC、协议字段、flags、数值范围、无效位姿回退和错误响应均通过 Vivado 仿真；UART 链路仿真还验证了完整收发、响应 CRC 及参数 bank 在合成帧边界切换。PDS 已生成测试位流 [`uart_echo_test_top.sbit`](../../fpga/project/stage8_brown_y_uart_echo_test/generate_bitstream/uart_echo_test_top.sbit)。该回环测试顶层只提供 UART 和 LED 诊断信号，没有接到 Stage 8 图像通路；本节实测的 `00` 回包只证明协议帧被接受。其后另建了接入视频通路的参数测试工程，实板结果见下节。协议与上板说明见独立测试工程的 [`README.md`](../../fpga/project/stage8_brown_y_uart_echo_test/README.md)。
+
+### Stage 8 视频通路 UART 平移与旋转实板验证（2026-10-27）
+
+在独立工程 [`stage8_brown_y_uart_parameter_test`](../../fpga/project/stage8_brown_y_uart_parameter_test/README.md) 中，将 UART 单应矩阵参数接入 Stage 8 Brown Y 修复版、1280×720 DDR 视频通路。上板文件为 [`HDMI_IN_DDR3_HDMI_OUT_top.sbit`](../../fpga/project/stage8_brown_y_uart_parameter_test/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit)，SHA-256 为 `6F350DAD693B58FA7A797FE8C91FC9F3D0E44B014FC870762E0134E9C43C9EDA`；构建报告为 `All Constraints Met`，DDR 系统时钟 setup WNS `+0.014 ns`。串口使用 COM7、115200 baud、8-N-1、无流控，FPGA RX/TX 为 B24/C24。串口助手重启后开始正常收发；这说明重启后恢复了本次测试，但未单独确认此前无响应的具体原因。
+
+实板发送单位矩阵请求后收到 45 字节 ACK，头部为 `A5 5A 01 81 01 00 00`，状态 `00`，CRC `10 63`。随后发送序号 2 的 `h02=+16 px` 平移矩阵，收到序号 `02 00`、状态 `00`、CRC `1C C7` 的 ACK；显示画面发生相应平移。重复发送同一组系数时 LED3 再次翻转，但画面不继续累加移动，这是协议上传绝对矩阵而非增量位移的预期行为。
+
+之后分别发送顺时针 30° 与反方向 30° 的矩阵（序号 5、6）。两次都观察到图像按相反方向旋转，旋转后画面出现黑色边角／裁切，符合旋转采样越出输入图像范围的现象。该结果实证了 UART 参数经过解析、参数 bank 帧边界更新、单应映射并影响视频输出；它验证的是矩阵旋转通路，不代表系统已能直接接收一个角度数值。现有 45 字节协议仍只承载 9 个单应系数；上位机需根据测得的角度和方向换算出矩阵，再按 Q16.16／Q2.30 格式发送。输入画面本身水平时，正负 30° 帧会分别生成相反方向的旋转；实际校正应依据输入倾斜方向选取抵消它的角度符号。LED3 每收到完整请求翻转；实测 LED6 常亮、LED4/LED5 熄灭，与当前显示通路状态和错误指示映射一致。
+
+### Stage 9 双三次吞吐优化与停顿诊断（2026-10-27）
+
+整理 Stage 9 测试工程后，项目目录目前保留三个版本：原始基线 [`stage9_bicubic_catmull_rom`](../../fpga/project/stage9_bicubic_catmull_rom/README.md)、当前双上下文稳定版 [`stage9_bicubic_catmull_rom_multi_pixel_test`](../../fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/README.md)，以及从稳定版复制出的诊断工程 [`stage9_bicubic_catmull_rom_stall_profile_test`](../../fpga/project/stage9_bicubic_catmull_rom_stall_profile_test/README.md)。已核对目录，先前的 Brown 修复、窗口复用、窗口复用诊断和单上下文查询流水副本均已移除；稳定版和诊断版仍在。
+
+稳定版在前一阶段的实板截图中显示画面处理吞吐已提升。Fabric Debugger 两次采样时间为 2026-10-27 12:49:38 与 12:50:04，间隔 26 秒；输入 VSYNC 从 `0x1539` 增至 `0x1B76`，累计增加 1,597 帧，约 **61.4 fps**；处理完成计数从 `0x080C` 增至 `0x0A6A`，增加 606 帧，约 **23.3 fps**；显示取帧计数与处理完成计数同步增加 606，错误标志为 `0x00`。此前工程记录中另有约 7.1 fps 的读数，但测量时段和构建版本并非严格配对对照；当前截图本身证明处理输出约为 23.3 fps，输入仍约 61 fps，因此输入帧并非全部都能处理和显示。
+
+该稳定版最近完成帧的 `perf_frame_cycles=0x0053CEA6`，按 125 MHz 计约 **43.94 ms**；`perf_coord_stall_cycles=0x0045BDB0`，约占帧周期 **83.2%**。因此虽然实测处理速度已上升，坐标请求仍有大量停顿，尚有继续分析和优化空间。稳定版布线报告为 `All Constraints Met`，DDR 系统时钟 setup WNS **+0.049 ns**、hold WHS **+0.138 ns**；建立时间余量仍较小。
+
+为区分剩余停顿来源，新建停顿诊断副本。读取器增加最近完成帧的上下文队列满周期和输出反压周期，并与缓存 miss／回填计数一起观测；数据通路和插值算法沿用稳定版。读取器回归、64×8 完整帧仿真、PDS 综合布线和 bitstream 生成均通过。诊断版时序报告也显示 `All Constraints Met`，但 DDR 系统时钟 setup WNS 仅 **+0.009 ns**、hold WHS **+0.111 ns**，余量比稳定版更紧。
+
+诊断版的 `.sbit` 与 `.fic` 位于工程 `generate_bitstream/` 目录，必须配对使用：
+
+- [诊断 bitstream](../../fpga/project/stage9_bicubic_catmull_rom_stall_profile_test/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit)，SHA-256：`D1B06BF10A724E4D013D006BA785FEF2F02BD9C6823DADF24B11299E09AEA8F7`
+- [诊断 FIC](../../fpga/project/stage9_bicubic_catmull_rom_stall_profile_test/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.fic)，SHA-256：`C60F3F687B237F994CEB41192198F8F79B6A8772BB5BDD2BDA198FF936CF7E56`
+
+诊断副本尚未重新上板测量，不能把它当作新的帧率版本；当前约 23.3 fps 的实测仍来自双上下文稳定版。下一步用诊断版同次生成的 `.sbit/.fic` 上板，间隔 15–60 秒抓取两次 Listing，重点比较 `perf_cache_fill_cycles`、`perf_reader_queue_stall_cycles` 和 `perf_reader_output_stall_cycles`，据此决定是优化缓存回填、增加在途上下文，还是处理插值器后级反压。诊断计数彼此可能重叠，不能直接相加。
