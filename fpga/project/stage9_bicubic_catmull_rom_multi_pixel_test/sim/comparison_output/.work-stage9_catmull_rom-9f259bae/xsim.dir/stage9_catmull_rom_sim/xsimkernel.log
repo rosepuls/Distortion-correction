@@ -1,0 +1,7 @@
+Running: xsim.dir/stage9_catmull_rom_sim/xsimk.exe -runall -simmode gui -wdb stage9_catmull_rom_sim.wdb -simrunnum 0 -socket 59316
+Design successfully loaded
+Design Loading Memory Usage: 8688 KB (Peak: 8688 KB)
+Design Loading CPU Usage: 15 ms
+Simulation completed
+Simulation Memory Usage: 9352 KB (Peak: 9352 KB)
+Simulation CPU Usage: 312 ms

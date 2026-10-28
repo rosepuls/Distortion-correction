@@ -1,0 +1,4 @@
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage8_brown_y_mul_fix_test/source/rtl/correction/pipelined_bilinear_interpolator.sv" into library work
+INFO: [VRFC 10-311] analyzing module pipelined_bilinear_interpolator
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/interpolation_visual_tb.sv" into library work
+INFO: [VRFC 10-311] analyzing module interpolation_visual_tb

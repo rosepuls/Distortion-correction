@@ -1,0 +1,13 @@
+Vivado Simulator 2020.2
+Copyright 1986-1999, 2001-2020 Xilinx, Inc. All Rights Reserved.
+Running: D:/Xilinx/Vivado/2020.2/bin/unwrapped/win64.o/xelab.exe work.interpolation_visual_tb -s stage9_catmull_rom_sim --log xelab.log 
+Multi-threading is on. Using 30 slave threads.
+Starting static elaboration
+Pass Through NonSizing Optimizer
+Completed static elaboration
+Starting simulation data flow analysis
+Completed simulation data flow analysis
+Time Resolution for simulation is 1ps
+Compiling module work.pipelined_catmull_rom_interpolat...
+Compiling module work.interpolation_visual_tb
+Built simulation snapshot stage9_catmull_rom_sim

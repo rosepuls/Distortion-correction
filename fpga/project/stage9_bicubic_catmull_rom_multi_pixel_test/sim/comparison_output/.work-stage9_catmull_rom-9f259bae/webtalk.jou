@@ -1,0 +1,12 @@
+#-----------------------------------------------------------
+# Webtalk v2020.2 (64-bit)
+# SW Build 3064766 on Wed Nov 18 09:12:45 MST 2020
+# IP Build 3064653 on Wed Nov 18 14:17:31 MST 2020
+# Start of session at: Tue Oct 27 13:00:00 2026
+# Process ID: 27284
+# Current directory: C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage9_catmull_rom-9f259bae
+# Command line: wbtcv.exe -mode batch -source C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage9_catmull_rom-9f259bae/xsim.dir/stage9_catmull_rom_sim/webtalk/xsim_webtalk.tcl -notrace
+# Log file: C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage9_catmull_rom-9f259bae/webtalk.log
+# Journal file: C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage9_catmull_rom-9f259bae\webtalk.jou
+#-----------------------------------------------------------
+source C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage9_catmull_rom-9f259bae/xsim.dir/stage9_catmull_rom_sim/webtalk/xsim_webtalk.tcl -notrace

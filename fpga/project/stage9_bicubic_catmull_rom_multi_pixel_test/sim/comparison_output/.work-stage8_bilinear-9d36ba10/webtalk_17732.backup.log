@@ -1,0 +1,13 @@
+#-----------------------------------------------------------
+# Webtalk v2020.2 (64-bit)
+# SW Build 3064766 on Wed Nov 18 09:12:45 MST 2020
+# IP Build 3064653 on Wed Nov 18 14:17:31 MST 2020
+# Start of session at: Tue Oct 27 12:59:07 2026
+# Process ID: 17732
+# Current directory: C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage8_bilinear-9d36ba10
+# Command line: wbtcv.exe -mode batch -source C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage8_bilinear-9d36ba10/xsim.dir/stage8_bilinear_sim/webtalk/xsim_webtalk.tcl -notrace
+# Log file: C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage8_bilinear-9d36ba10/webtalk.log
+# Journal file: C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage8_bilinear-9d36ba10\webtalk.jou
+#-----------------------------------------------------------
+source C:/Study/IC_Study/Project/FPGA/Contest/Pango_Micro_FPGA/Distortion-correction/fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/sim/comparison_output/.work-stage8_bilinear-9d36ba10/xsim.dir/stage8_bilinear_sim/webtalk/xsim_webtalk.tcl -notrace
+INFO: [Common 17-206] Exiting Webtalk at Tue Oct 27 12:59:07 2026...
