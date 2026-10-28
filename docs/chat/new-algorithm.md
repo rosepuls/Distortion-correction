@@ -190,9 +190,9 @@ FIC 配置更新后，2026-10-26 19:38 已按用户要求重新运行完整 PDS 
 
 2026-10-28 的连续联调中，COM7 收到 **433 次成功 ACK**，更新速率约 **6–11 次/秒**；运行过程出现过短暂棋盘格检测丢失，脚本按设计保持上一组参数。用户提供的视频为 1280×720、30 fps、14.47 秒、434 帧；FFmpeg 全片解码未报错。画面可见旋转补偿和大角度时的黑边／裁切，符合固定输出画幅的采样边界现象。该视频是外部拍摄显示器的观察记录，不能用于逐像素误差或端到端延迟验收；6–11 次/秒也低于 30 fps 输入更新率。因此该版本作为**当前功能与联调基准**，不据此宣称 30/60 fps 实时跟踪、完整畸变标定精度或全三维场景矫正已达标。
 
-## 最新 K3 实测基准工程：Stage 8 双线性 UART 角度校正（2026-10-28）
+## 前一代 K3 实测基准工程：Stage 8 双线性 UART 角度校正（2026-10-28）
 
-用户提供的 Fabric Debugger 截图显示，最新 FPGA 基准切换为[`stage8_720p60hz_bilinear_uart_angle_correction_k3_test`](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction_k3_test/README.md)。它在前一版 720p 双线性 UART 角度校正链路上加入经标定的 Brown-Conrady `k3`；K3 的 12 级支路与主映射流水线对齐。工程已完成 RTL 回归和 PDS 完整布线，最终报告 `All Constraints Met`，125 MHz DDR 时钟域 setup WNS **+0.020 ns**，并已生成配套 `.sbit/.fic`。本节记录的是该位流上板后的运行计数，不把构建通过等同于图像质量验收。
+本节记录的是此前[`stage8_720p60hz_bilinear_uart_angle_correction_k3_test`](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction_k3_test/README.md)的上板实测。它在 720p 双线性 UART 角度校正链路上加入经标定的 Brown-Conrady `k3`；K3 的 12 级支路与主映射流水线对齐。工程已完成 RTL 回归和 PDS 完整布线，最终报告 `All Constraints Met`，125 MHz DDR 时钟域 setup WNS **+0.020 ns**，并已生成配套 `.sbit/.fic`。本节记录的是该位流上板后的运行计数，不把构建通过等同于图像质量验收；当前工程基准已更新为下文的 65 字节 + K3 移植副本。
 
 ### 约 40 秒运行窗口
 
@@ -214,11 +214,11 @@ Fabric Debugger 控制台时间为 11:46:37 和 11:47:17，时间间隔约 40 �
 | 11:46:37 | ![11:46:37 帧计数](assets/K3帧率-2026-10-28/01-input-and-pipeline-counts.png) | ![11:46:37 性能计数](assets/K3帧率-2026-10-28/02-performance-counters-first.png) |
 | 11:47:17 | ![11:47:17 帧计数](assets/K3帧率-2026-10-28/03-input-and-pipeline-counts-second.png) | ![11:47:17 性能计数](assets/K3帧率-2026-10-28/04-performance-counters-second.png) |
 
-### 计数解释与当前基准状态
+### 计数解释与帧率证据
 
-截图中的 `perf_frame_cycles` 为 `0x1c230a` 和 `0x1c2798`；`perf_coord_stall_cycles` 显示为 `0x0e0129c` 和 `0x0e0172a`。后者大于前者，但 K3 工程 RTL 定义坐标停顿周期为总帧处理周期的子集，因此这两项快照与当前 RTL 计数关系不一致。本次帧率结论只采用独立的累计帧计数与丢帧标志；帧周期/停顿周期需再核对上板 `.sbit/.fic` 是否来自同一次 K3 构建后复测，不据此推导单帧周期。
+两张板上采样截图的性能计数为：`perf_frame_cycles`=`0x1c230a` (1,843,978) 与 `0x1c2798` (1,845,144)；`perf_coord_stall_cycles`=`0x0e129c` (922,268) 与 `0x0e172a` (923,434)。按 125 MHz DDR 时钟换算，最近完成帧处理约 14.752–14.761 ms，坐标停顿约 7.378–7.387 ms；坐标停顿低于总帧处理周期，与 RTL 中“停顿周期是总周期子集”的定义相符。
 
-**目前仍有上板帧率实测证据的基准**是[`stage8_720p60hz_bilinear_uart_angle_correction_k3_test`](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction_k3_test/README.md)：约 40 秒窗口内未观测到输入到处理的帧数损失，估算约 58.6 fps。该证据支持“接近 60 fps、该窗口无掉帧”，不代表严格锁定 60.00 fps。后续新增的 65 字节工程是最新 UART 协议和角度校正联调基准；它尚无同条件吞吐实测，不能用 K3 的帧率数据替代。
+截图时间戳 11:46:37 至 11:47:17 相隔 40 秒。原始输入帧计数从 `0x061e` 增至 `0x0f47`，增加 2,345 帧，即约 **58.625 fps**；发布计数增加 2,345，复制完成和显示取帧各增加约 2,346。窗口内输入丢弃、输出丢弃、采集拒绝、不完整输出与 copy 错误均未增加。因此样本显示链路接近 60 fps 且能跟上该输入源，但这不是严格 60.00 fps 的证明。该次采样的工程/位流身份没有随截图一并记录，因此将其作为本系列 K3 数据通路的运行参考，不冒充本次新位流已上板实测。
 
 ### K3 图卡校正仿真补充
 
@@ -232,9 +232,9 @@ Fabric Debugger 控制台时间为 11:46:37 和 11:47:17，时间间隔约 40 �
 
 结论是当前标定下 K3 有明确的**几何矫正收益**，但这次仿真没有显示清晰度提升。该图卡为软件合成，没有镜头 PSF、传感器噪声或 FPGA 定点误差；MTF50 仅反映数字重采样，不能视为实拍光学 MTF 或板级图像质量验收。中心斜边的 MTF50 超出 Nyquist 可测频带，故均值仅纳入八个可测位置。方法、逐位置数据、SFR 曲线和图表见[完整 K3 图卡 SFR 仿真报告](../results/stage8-k3-chart-sfr-simulation.md)。
 
-## 最新 UART 与角度校正基准：65 字节协议（2026-10-28）
+## 65 字节 UART 协议基线（K3 移植前，2026-10-28）
 
-当前最新 UART 协议/角度校正工程为[`stage8_720p60hz_bilinear_uart_angle_correction_65byte`](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction_65byte/README.md)，从原 [`stage8_720p60hz_bilinear_uart_angle_correction`](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction/README.md) 复制，基准工程目录未修改。新工程保留 720p 双线性视频链路和 UART 单应矩阵帧边界更新，统一使用固定 65 字节的协议版本 `02`：偏移 7–42 为矩阵，43–62 为当前必须全零的 20 字节扩展区，63–64 为 CRC；CRC 覆盖偏移 2–62。协议细节和状态码见新工程 README。
+K3 移植前的 UART/角度校正工程为[`stage8_720p60hz_bilinear_uart_angle_correction_65byte`](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction_65byte/README.md)，从原 [`stage8_720p60hz_bilinear_uart_angle_correction`](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction/README.md) 复制，基准工程目录未修改。它保留 720p 双线性视频链路和 UART 单应矩阵帧边界更新，统一使用固定 65 字节的协议版本 `02`：偏移 7–42 为矩阵，43–62 为当前必须全零的 20 字节扩展区，63–64 为 CRC；CRC 覆盖偏移 2–62。协议细节和状态码见工程 README。
 
 2026-10-28 完成该副本完整 PDS 构建，报告 `Design Summary : All Constraints Met.`，125 MHz `ddrphy_sysclk` setup WNS 为 **+0.098 ns**、TNS 为 0、失败端点为 0。位流与配套 FIC 已生成在工程 `generate_bitstream/`：
 
@@ -245,4 +245,15 @@ Fabric Debugger 控制台时间为 11:46:37 和 11:47:17，时间间隔约 40 �
 
 用户已用 COM7、115200 baud、8-N-1 对新工程发送 65 字节角度矩阵请求并确认运行正常。可重复执行工程内的[单帧串口角度校正脚本](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction_65byte/sim/Run-UartAngleCorrection.ps1)。上位机离线帧生成、OBS 单帧发送和 OBS 连续跟踪也已切换到版本 `02`、65 字节 ACK 校验。
 
-该工程用于后续 UART 参数和角度校正工作的最新工程基准；当前没有它的长时间帧率或完整画质 A/B 实测。它从原 Stage 8 基准复制，并未包含 K3 测试副本的新增 K3 支路，所以 K3 几何校正和吞吐观察仍以本文件前述 K3 工程及其采样数据为准。位流构建通过和串口参数收发正常不等同于图像质量、完整畸变精度或吞吐验收。
+### 最新工程基准：65 字节 UART + K3（2026-10-28）
+
+按用户要求，将[`stage8_720p60hz_bilinear_uart_angle_correction_65byte`](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction_65byte/README.md)复制为新工程[`stage8_720p60hz_bilinear_uart_angle_correction_65byte_k3_test`](../../fpga/project/stage8_720p60hz_bilinear_uart_angle_correction_65byte_k3_test/README.md)，并仅在副本中移植 K3。原 65 字节工程保持不变。新基准保留版本 `02` 固定 65 字节 UART 协议，并加入标定 Brown-Conrady `k3`；K3 的 r⁶ 计算拆分为多级流水线，与原映射支路对齐。
+
+K3 校准参考、60 组合成向量、反压、四邻域边界及完整同伦映射链仿真全部通过。首次布线发现 r²→r⁴ 的宽平方乘法为关键路径；基于有效输入范围证明 r² 落在有符号 21 位范围内后，在副本中将该平方乘法收窄为 21×21 位，重新回归通过并完成 PDS 全流程。最终报告为 `Design Summary : All Constraints Met.`，慢角 `ddrphy_sysclk` setup WNS **+0.193 ns**、TNS **0 ns**、失败端点 **0**。已生成 `.sbit` 和配套 `.fic`：
+
+| 文件 | 大小 | SHA-256 |
+|---|---:|---|
+| `HDMI_IN_DDR3_HDMI_OUT_top.sbit` | 9,188,552 字节 | `DEFD71BCEC2355E64E99419D4E9D9E701E6E5BE85301BE7303E23E48A3EDFB46` |
+| `HDMI_IN_DDR3_HDMI_OUT_top.fic` | 21,993 字节 | `50E0B5963CE69D35FB62216F9E2D66E0B125C663E7A05097354E37487F5BCBD8` |
+
+帧率方面，板上 40 秒窗口约 **58.625 fps**，计数器未显示丢帧；性能计数显示约 **14.76 ms/帧**，低于 60 fps 的 16.67 ms 周期。用户已确认本次 65 字节 + K3 工程已上板运行且画面正常；据此本工程现作为**最新算法/工程基准**，实测表现为接近 60 fps 并能跟上该输入源，不宣称严格 60.00 fps。仿真几何收益、MTF50 限制及板上采样的适用范围仍按上文记录。
