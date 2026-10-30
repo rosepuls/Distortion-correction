@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "status": "provisional_curve5_calibration_test",
+  "note": "Copied from the stable 1-4 refit project. Keep profiles 0-4 unchanged; update only profile 5 to the calibration candidate gamma=0.65, knee=120, power=2.80.",
+  "profiles": {
+    "0": {
+      "name": "bypass",
+      "kind": "identity"
+    },
+    "1": {
+      "name": "night",
+      "kind": "gamma",
+      "gamma": 0.61
+    },
+    "2": {
+      "name": "night_strong",
+      "kind": "gamma",
+      "gamma": 0.41
+    },
+    "3": {
+      "name": "highlight",
+      "kind": "shoulder",
+      "knee": 108,
+      "power": 1.45
+    },
+    "4": {
+      "name": "highlight_strong",
+      "kind": "shoulder",
+      "knee": 88,
+      "power": 2.15
+    },
+    "5": {
+      "name": "mixed",
+      "kind": "toe_shoulder",
+      "gamma": 0.65,
+      "knee": 120,
+      "power": 2.8
+    }
+  }
+}

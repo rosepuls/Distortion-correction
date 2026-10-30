@@ -126,3 +126,27 @@ Stage 11 接口已固定并接入 RTL：65 字节版本 `02` 的偏移 43 为曲
 - 今天完成：按现存 90 张 PNG 重算六类统计与 540 组曲线对照，提出上面的 5 号新参数。**本次只更新本文档和离线对照输出；JSON、RTL ROM、位流及板上参数均尚未改为新 5 号。**
 - 明天第一步：在 `host/pose/lighting_curve_parameters.json` 把 5 号 `knee` 改为 `120`、`power` 改为 `2.80`，`gamma` 仍为 `0.65`；运行 `python host/pose/compare_lighting_curves.py` 复核新旧混合图，再运行 `python host/pose/generate_lighting_lut_rom.py` 生成 `stage11_720p60hz_adaptive_image_enhancement_test/source/rtl/correction/lighting_lut_rom.sv`。ROM 是生成文件，不手改 256 项常量。
 - 随后：重新构建 Stage11 位流并核对时序，通过 PDS 烧录新位流。用相同 OBS 相机设置和同一场景依次发送 `0` 与 `5`，观察暗部细节、高光层次、正常色块及颜色偏移；再测 1–4 号。保存原始帧、显示输出及 ACK 日志。若 5 号使正常区域偏色或偏暗，再据同一批样本微调 gamma/knee/power 并重建。
+
+### 2026-10-30：校准曲线独立副本与位流
+
+- 原工程 `stage11_720p60hz_adaptive_image_enhancement_test` 已恢复到本轮改动前状态。参数验证和构建放在独立副本 `stage11_720p60hz_adaptive_image_enhancement_curve5_test`。
+- 对 `lighting_samples/` 六类各 15 张图运行 `compare_lighting_curves.py`，处理 90 张图、生成 540 组对照。1–4 号沿用该批样本确认的参数：`gamma=0.68/0.45`、高光 `(knee=112,power=1.55)` 和 `(88,1.80)`；5 号使用 `gamma=0.65,knee=120,power=2.80`。测量摘要和参数快照见副本 README 与 `lighting_curve_parameters.json`。新 5 号关键点为 `64→104, 137→128, 205→180, 250→246`。
+- 副本完整 PDS 构建通过；布线后报告 `All Constraints Met`，125 MHz `ddrphy_sysclk` setup WNS `+0.215 ns`、TNS 0、失败端点 0。`.sbit` SHA-256：`849C9600B117C1FAC5D7A56DF724C984E91127A9BB588D4FDD4A7316BE8C1C4D`；配套 `.fic` SHA-256：`A17CCFAFFC8EB1DE783696786675A4F63DE84A889681566A07698E6EC23D97BA`。
+- 下一步烧录副本的配套位流/FIC，做同场景 `0–5` 上板对比，并保存输入、显示输出及 ACK 日志。当前画质仍待实板验证。
+
+### 2026-10-30：1–4 号曲线按样本重新拟合
+
+- 用户要求建立只验证 1–4 号曲线变化的工程。核对后发现 `curve5_test` 相对旧 Stage11 的 LUT 差异只有 5 号；旧工程 1–4 号表已经使用此前记录的样本参数。因此从旧工程完整复制出 `stage11_curve1to4_refit_test`，以重新拟合后的参数替换 LUT 1–4，保留 0 号恒等表和旧版 5 号 `gamma=0.65, knee=155, power=1.65`。本副本 `impl.tcl` 与旧工程一致，避免现有 `curve5_test` 中重复追加的构建命令成为变量。目录名缩短是为了让 PDS 能读取完整路径达到 260 字符的 DDR3 IP 文件。
+- 拟合数据为 `lighting_samples/` 中 1–4 类各 15 张 1280×720 原图。以各自类别的中位输出亮度作为明确目标（1–4 号分别为 125、45、180、210），对 gamma 或 knee/power 做有界候选搜索，并将 4 号输出灰度 ≥250 的比例限制在 0.5% 以下；先用 320×180 缩图搜索，再对选中参数用全部 15 张原始分辨率图复核。目标是可辨认的温和/较强提亮与温和/较强高光压缩，不代表主观画质真值或全场景最优解。
+- 0 号 `0_bypass` 的 15 张正常光照图也做了基线核对：输入平均亮度中位数 `159.38`，恒等 LUT 输出仍为 `159.38`，RGB 平均绝对变化为 0。它是旁路/复位默认曲线，不应拟合成色调变换；参数快照继续明确记录为 `kind=identity`，LUT 0 保持不变。
+- 新候选参数：1 号 `gamma=0.61`；2 号 `gamma=0.41`；3 号 `knee=108, power=1.45`；4 号 `knee=88, power=2.15`。相对旧 ROM，实际仅 LUT 1–4 改变，LUT 0、5 保持不变。
+- 全分辨率复核的逐类中位数：1 号输入/输出平均亮度 `96.78→123.82`，原暗区平均提亮 `32.54`；2 号 `8.14→42.00`，原暗区平均提亮 `33.35`；3 号 `196.97→180.40`；4 号 `226.51→210.09`，输出灰度 ≥250 的比例中位数 `0.0034%`。每类范围和逐图指标（含 0 号）保存在 `host/pose/output/lighting_curve_refit_20261030/metrics.csv`，汇总见同目录 `fit_summary.json`；0–5 号六类图像对照表保存在 `host/pose/output/lighting_curve_refit_20261030/comparisons/`。
+- 新副本已生成 `lighting_curve_parameters.json`、对应 RTL ROM 和位流。PDS 布线后报告 `All Constraints Met`；125 MHz `ddrphy_sysclk` setup WNS `+0.182 ns`、TNS 0、失败端点 0。新 `.sbit` SHA-256：`410CBBF706A9AB918328D37F92F8E36C8E72DB4E95F20D543BC4F1ED25642EE2`；配套且已指向新副本综合网表的 `.fic` SHA-256：`C4CE8C568B6E7538067B7EF683786F181B8909DFFF873B7D864D008E1F73B35A`。实板是否抖动及最终画质仍待验证；样本拟合只评价捕获图的亮度指标，不能单凭它判定运行稳定性。
+- 报告仍提示若干 HDMI/DDR/UART 输入输出端口没有外部时序约束；因此 `All Constraints Met` 只表示已约束路径通过，不能证明所有接口满足板级时序。构建还保留旧 DDR FIFO IP 的 PG2L100H 器件信息警告，当前设计目标是 PG2L200H。
+
+### 2026-10-30：当前最新校准基准版
+
+- 当前最新候选工程为 `fpga/project/stage11_720p60hz_adaptive_image_enhancement_calibrated_baseline`。它从已验证稳定的 `stage11_curve1to4_refit_test` 完整复制，仅将 LUT 5 更新为 lighting_samples 标定值 `gamma=0.65, knee=120, power=2.80`；LUT 0–4 保持稳定副本的值。参数记录在工程根目录 `lighting_curve_parameters.json`。
+- 已完成 PDS 综合、布局布线和位流生成，41969/41969 条网络布通。报告 `Design Summary : All Constraints Met`；慢角 `ddrphy_sysclk` setup WNS `+0.085 ns`、TNS 0、失败端点 0。该最小裕量较小，且报告不覆盖未设置外部约束的 HDMI/DDR/UART I/O。
+- 当前位流为 `fpga/project/stage11_720p60hz_adaptive_image_enhancement_calibrated_baseline/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit`，大小 9,188,552 字节，SHA-256 `25C6443F854D484E3EE427C7DBB3BCA2D2E4E855C3E6EC54853951EDF566549D`；烧录时使用同目录配套 `.fic`。板上无 UART 参数时画面是否抖动仍待验证，因此该工程是当前最新测试基准，不代表曲线 5 已通过实板验收。
+- 前文“明天第一步”中的 5 号重算和位流生成已完成，由本节的新基准记录取代；下一步是在板上用此 `.sbit/.fic` 观察无 UART 时的画面，并记录复现结果。原 Stage11 工程未被修改。
