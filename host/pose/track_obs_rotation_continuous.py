@@ -1,4 +1,4 @@
-"""Continuously send live OBS image-plane rotation matrices to Stage 8."""
+"""Track checkerboard corners and send live image-plane rotation matrices to Stage 8."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 import cv2
+import numpy as np
 import serial
 
 from analyze_parallel_rotation import load_calibration as load_rotation_calibration
@@ -48,6 +49,141 @@ def unwrap_near_reference(angle_mod_180: float, previous_angle: float | None) ->
     return angle_mod_180 + 180.0 * round((previous_angle - angle_mod_180) / 180.0)
 
 
+class PartialBoardAngleTracker:
+    """Acquire a full board once, then estimate roll from tracked partial corners."""
+
+    MIN_INLIERS = 8
+    MIN_INLIER_RATIO = 0.60
+    MAX_FORWARD_BACKWARD_ERROR = 1.5
+
+    def __init__(self, calibration: dict) -> None:
+        self.calibration = calibration
+        self.previous_gray: object | None = None
+        self.previous_points = None
+        self.reference_points = None
+        self.initial_angle: float | None = None
+        self.last_mode = "waiting"
+
+    def _gray(self, frame):
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    def _undistort(self, points):
+        return cv2.undistortPoints(
+            points.reshape(-1, 1, 2),
+            self.calibration["_camera_matrix"],
+            self.calibration["_distortion"],
+            P=self.calibration["_camera_matrix"],
+        ).reshape(-1, 2)
+
+    def _acquire_full_board(self, gray):
+        cols, rows = self.calibration["_board_size"]
+        flags = cv2.CALIB_CB_EXHAUSTIVE | cv2.CALIB_CB_ACCURACY
+        found, corners = cv2.findChessboardCornersSB(gray, (cols, rows), flags=flags)
+        if not found:
+            return None
+
+        self.previous_gray = gray
+        self.previous_points = corners.reshape(-1, 1, 2).astype("float32")
+        self.reference_points = self._undistort(self.previous_points)
+        undistorted = self.reference_points.reshape(rows, cols, 2)
+        row_vectors = np.asarray([
+            undistorted[row, cols - 2] - undistorted[row, 1]
+            for row in range(1, rows - 1)
+        ])
+        row_angles = np.arctan2(row_vectors[:, 1], row_vectors[:, 0])
+        doubled_mean = np.mean(np.exp(2j * row_angles))
+        angle = math.degrees(0.5 * math.atan2(doubled_mean.imag, doubled_mean.real))
+        self.initial_angle = ((angle + 90.0) % 180.0) - 90.0
+        self.last_mode = "full-board lock"
+        return self.initial_angle, len(self.previous_points), len(self.previous_points)
+
+    def update(self, frame):
+        """Return (angle, tracked_count, inlier_count), or None when confidence is low."""
+        gray = self._gray(frame)
+        if self.previous_gray is None or self.previous_points is None:
+            result = self._acquire_full_board(gray)
+            if result is None:
+                self.last_mode = "waiting"
+            return result
+
+        next_points, forward_status, _ = cv2.calcOpticalFlowPyrLK(
+            self.previous_gray,
+            gray,
+            self.previous_points,
+            None,
+            winSize=(21, 21),
+            maxLevel=3,
+            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+        )
+        if next_points is None or forward_status is None:
+            self._reset()
+            return self._acquire_full_board(gray)
+
+        backward_points, backward_status, _ = cv2.calcOpticalFlowPyrLK(
+            gray,
+            self.previous_gray,
+            next_points,
+            None,
+            winSize=(21, 21),
+            maxLevel=3,
+            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+        )
+        if backward_points is None or backward_status is None:
+            self._reset()
+            return self._acquire_full_board(gray)
+
+        forward = next_points.reshape(-1, 2)
+        backward = backward_points.reshape(-1, 2)
+        fb_error = ((backward - self.previous_points.reshape(-1, 2)) ** 2).sum(axis=1) ** 0.5
+        valid = (
+            forward_status.reshape(-1).astype(bool)
+            & backward_status.reshape(-1).astype(bool)
+            & (fb_error <= self.MAX_FORWARD_BACKWARD_ERROR)
+        )
+        tracked = int(valid.sum())
+        if tracked < self.MIN_INLIERS:
+            self._reset()
+            self.last_mode = "waiting for full-board reacquisition"
+            return None
+
+        current_ideal = self._undistort(next_points[valid])
+        reference = self.reference_points[valid]
+        matrix, ransac_mask = cv2.estimateAffinePartial2D(
+            reference.astype("float32"),
+            current_ideal.astype("float32"),
+            method=cv2.RANSAC,
+            ransacReprojThreshold=2.0,
+            maxIters=200,
+            confidence=0.99,
+            refineIters=10,
+        )
+        inliers = int(ransac_mask.sum()) if ransac_mask is not None else 0
+        if (
+            matrix is None
+            or inliers < self.MIN_INLIERS
+            or inliers / tracked < self.MIN_INLIER_RATIO
+        ):
+            self._reset()
+            self.last_mode = "waiting for full-board reacquisition"
+            return None
+
+        # Keep only RANSAC inliers and their original board-corner identities.
+        valid_indices = valid.nonzero()[0]
+        inlier_indices = valid_indices[ransac_mask.reshape(-1).astype(bool)]
+        self.previous_gray = gray
+        self.previous_points = next_points[inlier_indices].reshape(-1, 1, 2)
+        self.reference_points = self.reference_points[inlier_indices]
+        delta_angle = math.degrees(math.atan2(float(matrix[1, 0]), float(matrix[0, 0])))
+        self.last_mode = "partial-board tracking"
+        return self.initial_angle + delta_angle, tracked, inliers
+
+    def _reset(self) -> None:
+        self.previous_gray = None
+        self.previous_points = None
+        self.reference_points = None
+        self.initial_angle = None
+
+
 def main() -> int:
     args = parse_args()
     if not FIXED_REFERENCE.is_file():
@@ -76,6 +212,7 @@ def main() -> int:
 
     sequence = args.sequence if args.sequence is not None else (int(time.time()) & 0xFFFF)
     previous_angle: float | None = None
+    angle_tracker = PartialBoardAngleTracker(calibration)
     target_was_visible = False
     sent_count = 0
     last_angle = math.nan
@@ -86,7 +223,8 @@ def main() -> int:
     print(f"fixed reference: {FIXED_REFERENCE}")
     print(f"reference grid angle: {reference_angle:+.3f} deg")
     print(f"stream: source={args.source}, UART={args.port} at {UART_BAUD} baud")
-    print("one valid OBS frame -> one request -> wait for ACK; Ctrl+C stops updates")
+    print("full-board acquisition, then partial-corner tracking; confident estimate -> request -> ACK")
+    print("low confidence holds the FPGA's last matrix until a full board can be reacquired")
 
     try:
         port = serial.Serial(args.port, UART_BAUD, timeout=0.2, write_timeout=2.0)
@@ -99,13 +237,14 @@ def main() -> int:
                 continue
             validate_image_size(frame, calibration, "OBS frame")
 
-            try:
-                current_angle, _spread = estimate_grid_angle(frame, calibration)
-            except ValueError:
+            estimate = angle_tracker.update(frame)
+            if estimate is None:
                 if target_was_visible:
-                    print("checkerboard lost; holding FPGA's last accepted matrix")
+                    print("partial-board tracking lost; holding FPGA's last accepted matrix")
                     target_was_visible = False
                 continue
+
+            current_angle, tracked_count, inlier_count = estimate
 
             target_was_visible = True
             relative_mod_180 = wrap_half_turn(current_angle - reference_angle)
@@ -131,7 +270,10 @@ def main() -> int:
 
             now = time.monotonic()
             if now >= report_at:
-                print(f"accepted updates/s={report_count}; angle={last_angle:+.3f} deg; total={sent_count}")
+                print(
+                    f"accepted updates/s={report_count}; angle={last_angle:+.3f} deg; "
+                    f"mode={angle_tracker.last_mode}; corners={inlier_count}/{tracked_count}; total={sent_count}"
+                )
                 report_count = 0
                 report_at = now + 1.0
 

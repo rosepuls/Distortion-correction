@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "status": "provisional",
+  "note": "More visible provisional candidates for initial board comparison. Retune after collecting representative textured scenes.",
+  "profiles": {
+    "0": {"name": "bypass", "kind": "identity"},
+    "1": {"name": "night", "kind": "gamma", "gamma": 0.68},
+    "2": {"name": "night_strong", "kind": "gamma", "gamma": 0.45},
+    "3": {"name": "highlight", "kind": "shoulder", "knee": 112, "power": 1.55},
+    "4": {"name": "highlight_strong", "kind": "shoulder", "knee": 88, "power": 1.80},
+    "5": {"name": "mixed", "kind": "toe_shoulder", "gamma": 0.65, "knee": 155, "power": 1.65}
+  }
+}

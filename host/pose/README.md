@@ -127,10 +127,56 @@ UVC 实时帧 --track_pose.py--> pose estimates (JSONL)
 
 ## OBS 连续测角并实时发送
 
-[`track_obs_rotation_continuous.py`](track_obs_rotation_continuous.py) 使用同一张固定 `00.png` 参考图，逐帧测量 OBS 虚拟摄像机中的棋盘格方向，并在同一次运行内对模 180° 角度做连续展开。每检测到一帧有效棋盘格，就发送一组递增序号的矩阵参数并等待对应 ACK，再处理下一帧。棋盘格暂时丢失时不发送旧参数，FPGA 保持最后一次已接受的矩阵；按 `Ctrl+C` 停止后脚本关闭串口，FPGA 仍保持最后一次矩阵。
+[`track_obs_rotation_continuous.py`](track_obs_rotation_continuous.py) 使用同一张固定 `00.png` 参考图，启动时要求完整检测一次棋盘格以建立角点编号和初始方向；之后通过前后向光流跟踪角点，用 RANSAC 从仍可见的部分角点估计像平面旋转，并在同一次运行内对模 180° 角度做连续展开。只有至少 8 个跟踪点且 RANSAC 内点比例不低于 60% 时才发送递增序号的矩阵参数并等待对应 ACK。置信度不足时不发送参数，FPGA 保持最后一次已接受的矩阵；跟踪丢失后等待完整棋盘重新初始化。按 `Ctrl+C` 停止后脚本关闭串口，FPGA 仍保持最后一次矩阵。
+
+该连续跟踪器仍只校正棋盘格所在像平面的旋转，不估计完整 3D 姿态，也不能消除不同深度物体的视差。对称棋盘格仍有 180° 方向歧义；从任意角度启动或发生严重跟踪丢失后，需要完整棋盘重新初始化，若需任意朝向可靠重锁，应增加不对称方向标记。
 
 ```powershell
 .\.venv\Scripts\python.exe host\pose\track_obs_rotation_continuous.py
 ```
 
 默认 OBS 设备索引为 2、串口为 COM7，通信设置为 115200、8-N-1。可使用 `--source`、`--port` 和 `--sequence` 覆盖默认值。角度连续展开要求相邻成功检测之间的实际旋转小于 90°；启动时仍假设棋盘格相对 `00.png` 小于 90°。如果从任意大角度开始，或相机转得太快导致相邻采样跨过 90°，对称棋盘格本身无法确定正确分支，需要使用 ArUco/ChArUco 等方向标记。该脚本校正的是棋盘格平面内的旋转，不处理平移、倾斜透视或不同深度的视差。
+
+## 自动采集光照分类样本
+
+[`capture_lighting_samples.py`](capture_lighting_samples.py) 从 OBS 虚拟摄像机读取原始 BGR 帧，复用 `lighting_profile.py` 的分类规则。连续 3 帧分类一致后开始采集；每类默认最多保存 15 张，并限制同一类别每秒最多保存 1 张。某类达到上限后会跳过该类，继续收集其他类别；六类都满后自动退出。默认显示带分类状态和样本计数的预览窗口，按 `q` 可提前结束。
+
+在 `Distortion-correction/` 目录运行：
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\capture_lighting_samples.py
+```
+
+默认读取 OBS 虚拟摄像机索引 2，要求输入为 1280×720。图像按 `0_bypass`、`1_night`、`2_night_strong`、`3_highlight`、`4_highlight_strong`、`5_mixed` 分目录保存在 `host/pose/output/lighting_samples/`；`manifest.jsonl` 记录图像路径、稳定类别和亮度统计。已存在的 `sample_*.png` 会计入每类上限，重新运行可接着补齐。可用 `--source` 指定其他摄像头索引或视频文件，`--output` 指定保存目录，`--no-preview` 关闭窗口。
+
+## 生成并比较增强曲线候选
+
+六条曲线的参数在 [`lighting_curve_parameters.json`](lighting_curve_parameters.json) 中独立配置。当前候选用 gamma 曲线提亮暗部，用 knee/shoulder 曲线压缩高光；`5:mixed` 组合两者。参数需结合新拍的带纹理场景继续调整。
+
+2026-10-29 为便于首轮上板辨认，已加强 1–5 号候选：gamma 为 `0.68/0.45`，高光肩部参数为 `(knee=112,power=1.55)` 和 `(88,1.80)`，混合曲线为 `(gamma=0.65,knee=155,power=1.65)`。0 号仍为旁路。该组参数会明显改变中间调，当前用于快速确认链路，不代表最终画质参数。
+
+对自动采集的样本生成 LUT、逐图指标和每类对照图：
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\compare_lighting_curves.py
+```
+
+默认读取 `host/pose/output/lighting_samples/`，输出到 `host/pose/output/lighting_curve_comparison/`。每个类别生成一张对照图，列顺序为原图、0–5 号曲线；`metrics.csv` 记录平均亮度、暗部提亮量、高光保留比例及 RGB 平均变化；`lighting_luts.json` 保存实际 6×256 个表值。重拍时可用 `--input` 指向新目录，再运行同一命令。
+
+## OBS 实时光照检测并发送 Stage 11 曲线
+
+[`track_obs_adaptive_enhancement.py`](track_obs_adaptive_enhancement.py) 从原始 OBS 虚拟摄像机读取 1280×720 BGR 帧，复用 `lighting_profile.py` 的 0–5 号分类及连续 3 帧防抖。模式改变时使用 65 字节版本 `02` UART 请求发送曲线编号，并验证 FPGA 的完整 ACK、CRC 与负载回显。默认 COM7、OBS 设备索引 2；按 `Ctrl+C` 停止。运行前关闭其他占用 COM7 的串口脚本和串口助手；OBS 输入应为未经 FPGA 增强的原始画面。
+
+只试图像增强时，显式指定单位矩阵模式（会替换板上现有角度矩阵）：
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\track_obs_adaptive_enhancement.py --identity
+```
+
+同时进行角度矫正与图像增强时，不加 `--identity`。脚本先通过完整棋盘格锁定角点，再实时更新角度；跟踪暂时丢失时仍继续判断光照，如曲线变化则携带最后一次 ACK 确认的矩阵发送。在首次取得有效矩阵之前不发送曲线请求。
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\track_obs_adaptive_enhancement.py
+```
+
+可用 `--source`、`--port`、`--stable-frames` 和 `--report-every` 调整输入与报告间隔。停止脚本后，FPGA 保持最后一次已接受的曲线和矩阵。当前曲线与分类阈值仍是候选参数；这条实时链路用于观察实际效果，不代表画质收益已经验收。

@@ -40,14 +40,14 @@ D = [-0.414772866708, +0.241503289014, +0.001323712337,
 
 ## 目标
 
-在最终使用的 1280×720 模式下标定 UVC 工业相机，建立可重复的零位姿，并由上位机根据 UVC 图像估计相机姿态，再仅将姿态参数发送给 FPGA。上位机不对演示视频进行几何校正；坐标映射、DDR 分块读取和插值仍由 FPGA 完成。
+在最终使用的 1280×720 模式下标定 UVC 工业相机，建立可重复的零位姿，并由上位机根据相机实时画面估计相机姿态，再仅将姿态参数发送给 FPGA。运行时可让 Python 读取 OBS 虚拟摄像机输出，避免与 OBS 争用物理 UVC 设备；视频仍按 OBS → HDMI → FPGA → 显示器传输。上位机不对演示视频进行几何校正；坐标映射、DDR 分块读取和插值仍由 FPGA 完成。
 
 ## 当前设备与固定约定
 
 - 相机：Jierui Weitong DCXGW10，标称 720p60，配备 2.1 mm 广角镜头，视场角标称为 150–210°。将标称视场角视为产品参数，使用标定结果选择相机模型。
 - 标定板：9×6 个棋盘格内角点，方格边长 25 mm，A4 横向打印。棋盘格为 10×7 个方格，整体尺寸为 250×175 mm。
 - 使用 A4 横向、100% / 实际尺寸打印。关闭“适合页面”等缩放选项，并测量打印后的方格边长；若测量值与 25 mm 不同，则使用实测值。
-- 以 1280×720 分辨率采集原始 UVC 图像。整个标定和姿态测试期间固定镜头、焦距、分辨率和相机模式。不要使用 Windows 桌面截图或 FPGA 校正后的输出图像。
+- 标定图像使用 1280×720 原始 UVC 源截图。运行时姿态跟踪可读取 OBS 虚拟摄像机提供的场景画面；OBS 输出须保持 1280×720，不得裁剪、缩放或遮挡棋盘格。整个标定和姿态测试期间固定镜头、焦距、分辨率和相机模式。不要使用 Windows 桌面截图或 FPGA 校正后的显示器输出图像。
 - 现有脚本：`host/calibration/calibrate.py`、`host/calibration/export_fixed_parameters.py` 和 `host/reference/render_reference.py`。
 
 ## 阶段 1：采集标定图像
@@ -291,19 +291,56 @@ D = [k1=-0.4173938, k2=+0.2550259, p1=-0.00120436,
 
 之后分别发送顺时针 30° 与反方向 30° 的矩阵（序号 5、6）。两次都观察到图像按相反方向旋转，旋转后画面出现黑色边角／裁切，符合旋转采样越出输入图像范围的现象。该结果实证了 UART 参数经过解析、参数 bank 帧边界更新、单应映射并影响视频输出；它验证的是矩阵旋转通路，不代表系统已能直接接收一个角度数值。现有 45 字节协议仍只承载 9 个单应系数；上位机需根据测得的角度和方向换算出矩阵，再按 Q16.16／Q2.30 格式发送。输入画面本身水平时，正负 30° 帧会分别生成相反方向的旋转；实际校正应依据输入倾斜方向选取抵消它的角度符号。LED3 每收到完整请求翻转；实测 LED6 常亮、LED4/LED5 熄灭，与当前显示通路状态和错误指示映射一致。
 
-### Stage 9 双三次吞吐优化与停顿诊断（2026-10-27）
+### Stage 9 双三次吞吐优化（更新于 2026-10-28）
 
-整理 Stage 9 测试工程后，项目目录目前保留三个版本：原始基线 [`stage9_bicubic_catmull_rom`](../../fpga/project/stage9_bicubic_catmull_rom/README.md)、当前双上下文稳定版 [`stage9_bicubic_catmull_rom_multi_pixel_test`](../../fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/README.md)，以及从稳定版复制出的诊断工程 [`stage9_bicubic_catmull_rom_stall_profile_test`](../../fpga/project/stage9_bicubic_catmull_rom_stall_profile_test/README.md)。已核对目录，先前的 Brown 修复、窗口复用、窗口复用诊断和单上下文查询流水副本均已移除；稳定版和诊断版仍在。
+当前保留两个 Stage 9 工程：原始基线 [`stage9_bicubic_catmull_rom`](../../fpga/project/stage9_bicubic_catmull_rom/README.md) 和当前稳定测试版 [`stage9_bicubic_catmull_rom_multi_pixel_test`](../../fpga/project/stage9_bicubic_catmull_rom_multi_pixel_test/README.md)。
 
-稳定版在前一阶段的实板截图中显示画面处理吞吐已提升。Fabric Debugger 两次采样时间为 2026-10-27 12:49:38 与 12:50:04，间隔 26 秒；输入 VSYNC 从 `0x1539` 增至 `0x1B76`，累计增加 1,597 帧，约 **61.4 fps**；处理完成计数从 `0x080C` 增至 `0x0A6A`，增加 606 帧，约 **23.3 fps**；显示取帧计数与处理完成计数同步增加 606，错误标志为 `0x00`。此前工程记录中另有约 7.1 fps 的读数，但测量时段和构建版本并非严格配对对照；当前截图本身证明处理输出约为 23.3 fps，输入仍约 61 fps，因此输入帧并非全部都能处理和显示。
+当前烧录的是 `stage9_bicubic_catmull_rom_multi_pixel_test`。Fabric Debugger 两次采样时间为 2026-10-28 08:38:21 与 08:38:56，间隔 35 秒。输入 VSYNC 计数从 `0x0FA2` 增至 `0x17E0`，增加 2,110 帧，约 **60.3 fps**；输入发布计数从 `0x0FA0` 增至 `0x17DE`，同样增加 2,110 帧。处理完成计数从 `0x05EE` 增至 `0x090F`，增加 801 帧，约 **22.9 fps**；显示取帧计数同步增加 801。丢弃计数从 `0x09B0` 增至 `0x0ECD`，增加 1,309 帧；`801 + 1,309 = 2,110`，与输入发布增量一致。错误标志为 `0x00`。
 
-该稳定版最近完成帧的 `perf_frame_cycles=0x0053CEA6`，按 125 MHz 计约 **43.94 ms**；`perf_coord_stall_cycles=0x0045BDB0`，约占帧周期 **83.2%**。因此虽然实测处理速度已上升，坐标请求仍有大量停顿，尚有继续分析和优化空间。稳定版布线报告为 `All Constraints Met`，DDR 系统时钟 setup WNS **+0.049 ns**、hold WHS **+0.138 ns**；建立时间余量仍较小。
+因此当前稳定版确实持续输出视频，处理吞吐约为输入帧率的 **38%**，约 **62%** 的输入帧被丢弃，画面仍可能表现为低帧率或不连贯。最近完成帧的 `perf_frame_cycles=0x0053CEA6`，按 125 MHz 计算约 **43.94 ms／帧（22.8 fps）**；`perf_coord_stall_cycles=0x0045BD9B`，约占帧周期 **83.2%**。周期计数估算与两次计数的实测吞吐基本一致，后续优化重点仍是减少坐标请求停顿。此次截图中的错误标志为零，但该采样不能单独证明长时间运行不会冻结。
 
-为区分剩余停顿来源，新建停顿诊断副本。读取器增加最近完成帧的上下文队列满周期和输出反压周期，并与缓存 miss／回填计数一起观测；数据通路和插值算法沿用稳定版。读取器回归、64×8 完整帧仿真、PDS 综合布线和 bitstream 生成均通过。诊断版时序报告也显示 `All Constraints Met`，但 DDR 系统时钟 setup WNS 仅 **+0.009 ns**、hold WHS **+0.111 ns**，余量比稳定版更紧。
+此前稳定版实板测量为约 **23.3 fps**（2026-10-27，26 秒区间）；本次为约 **22.9 fps**（2026-10-28，35 秒区间），两次结果接近，暂无证据表明本次运行比此前有明显帧率提升或下降。当前稳定版布线报告为 `All Constraints Met`，DDR 系统时钟 setup WNS **+0.049 ns**、hold WHS **+0.138 ns**；建立时间余量较小。
 
-诊断版的 `.sbit` 与 `.fic` 位于工程 `generate_bitstream/` 目录，必须配对使用：
+### OBS 虚拟摄像机姿态跟踪验证（2026-10-28）
 
-- [诊断 bitstream](../../fpga/project/stage9_bicubic_catmull_rom_stall_profile_test/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit)，SHA-256：`D1B06BF10A724E4D013D006BA785FEF2F02BD9C6823DADF24B11299E09AEA8F7`
-- [诊断 FIC](../../fpga/project/stage9_bicubic_catmull_rom_stall_profile_test/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.fic)，SHA-256：`C60F3F687B237F994CEB41192198F8F79B6A8772BB5BDD2BDA198FF936CF7E56`
+视频实际链路为 **UVC 工业相机 → OBS 场景 → 电脑 HDMI → FPGA → 显示器**。显示器接在 FPGA 输出端，因此 Python 不读取显示器画面，也不直接重新打开被 OBS 占用的 `DECXIN`。OBS 启用内置虚拟摄像机后，Python 从 OBS 场景的虚拟摄像头输出取帧；这条旁路不改变送入 FPGA 的 HDMI 视频。
 
-诊断副本尚未重新上板测量，不能把它当作新的帧率版本；当前约 23.3 fps 的实测仍来自双上下文稳定版。下一步用诊断版同次生成的 `.sbit/.fic` 上板，间隔 15–60 秒抓取两次 Listing，重点比较 `perf_cache_fill_cycles`、`perf_reader_queue_stall_cycles` 和 `perf_reader_output_stall_cycles`，据此决定是优化缓存回填、增加在途上下文，还是处理插值器后级反压。诊断计数彼此可能重叠，不能直接相加。
+本机 OBS 为 32.2.2。DirectShow 枚举结果包含 `Integrated Camera`、`DECXIN` 和 `OBS Virtual Camera`。FFmpeg 从 `OBS Virtual Camera` 成功抓取到 **1280×720、60 fps** 视频帧。OpenCV 使用本机设备索引 `2` 打开虚拟摄像机，并按 `calibration.json` 请求 1280×720；实际读到的帧尺寸为 **1280×720**。设备索引由系统枚举顺序决定，换电脑或设备顺序变化后应重新枚举，不能把 `2` 当作通用固定值。
+
+第一次 20 帧连读时棋盘格尚未进入画面，检测结果为 0/20；随后棋盘格移入视野，`track_pose.py` 连续读取中检测到有效姿态。一次短采样的 12 条记录全部为 `valid=true`，相对欧拉角约为 `roll_x=-12.49°…-11.94°`、`pitch_y=-6.05°…-5.69°`、`yaw_z=-20.22°…-19.99°`。之后连续读取约 460 帧，最新可见记录仍为 `valid=true`；采样过程中棋盘姿态在移动，最新读数约为 `roll_x=-3.65°`、`pitch_y=-4.99°`、`yaw_z=-35.27°`。这些角度均相对于 `reference_pose.json` 的零位姿，`yaw_z` 是本脚本定义下绕 Z 轴的分量，可作为当前像平面旋转的近似观测；它们不是角度标签真值，FPGA 补偿方向仍须通过已知方向的实物运动确认。
+
+实时读取命令如下（在 `Distortion-correction/` 目录执行；本机当前 OBS 虚拟摄像机索引为 2）：
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\track_pose.py `
+  --calibration host\calibration\output\calibration.json `
+  --reference host\calibration\output\reference_pose.json `
+  --source 2 --display `
+  --output host\calibration\output\obs_virtual_pose_log.jsonl
+```
+
+当前 `track_pose.py` 输出逐帧姿态 JSONL，不会发送 UART。本次验证仅确认 OBS 虚拟摄像机取帧和棋盘姿态检测，不代表 UART 自动闭环、FPGA 实时角度更新、场景校正精度或 60 fps 处理吞吐已验证。运行时必须让完整 9×6 内角点棋盘格持续可见；若 OBS 虚拟摄像机仍输出被遮挡或裁剪的画面，检测会产生 `valid=false` 记录，而不会沿用上一帧角度。
+
+### Stage 8 旋转吞吐优化（2026-10-28）
+
+针对旋转角度增大时帧率下降的问题，从最新 `stage8_720p60hz_bilinear_uart_angle_correction_65byte` 基准复制出独立工程 [`stage8_65byte_rotation_block_reuse_test`](../../fpga/project/stage8_65byte_rotation_block_reuse_test/README.md)，没有修改基准工程。原先每个输入帧按输出图像逐行取样；新工程改为先处理宽 128 像素、高 90 行的输出块，再处理下一块。像素仍通过 128 像素／16-beat DDR 突发写入，但写地址按像素实际输出坐标计算，所有写突发排空后才发布输出帧。这样让相邻输出行更早复用相同源图 tile，且未扩大容易引发布线拥塞的 tile cache。
+
+角度扫描模型使用当前 Brown 系数、32×4 像素 tile、16 set × 8 way 和现有 set 哈希。逐行顺序在 0°、30°、60°时分别估计约 5,664、89,480、141,609 次 cache miss；90 行块顺序分别约 5,919、6,227、5,922 次。30°逐行模型值与此前实板诊断的约 85,011 次 miss 接近。模型只用于比较访存局部性，不能替代硬件周期或帧率测量。
+
+新工程已完成 PDS 综合、布局布线和位流生成，报告为 `Design Summary : All Constraints Met`；125 MHz DDR 系统时钟 setup WNS 为 `+0.050 ns`。输出地址遍历检查覆盖全部 921,600 个像素、7,200 个对齐写突发和 720 个行尾标记。位流 [`HDMI_IN_DDR3_HDMI_OUT_top.sbit`](../../fpga/project/stage8_65byte_rotation_block_reuse_test/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit) 与配套 FIC [`HDMI_IN_DDR3_HDMI_OUT_top.fic`](../../fpga/project/stage8_65byte_rotation_block_reuse_test/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.fic) 来自同一次构建；位流 SHA-256 为 `3BF268987F2736277C4929B40DA8F2591FAA8CA4BB1B213EB9664FEF97883239`。
+
+用户随后确认旋转帧率问题已经改好。当前对话没有附两次采样的输入发布／处理完成计数、采样间隔或具体角度，因此这里只记录定性实板结论，不补写具体 FPS，也不将其表述为所有角度均达到 60 fps。后续记录应注明实测角度、30–60 秒窗口内的 `input_published_count` 与 `copied_count` 增量，以及 `perf_frame_cycles`、`perf_cache_miss_count` 和 `perf_write_wait_cycles`；通道映射与采样方法见测试工程 [`README_JTAG.md`](../../fpga/project/stage8_65byte_rotation_block_reuse_test/README_JTAG.md)。
+
+### OBS 部分棋盘实时旋转跟踪与小网格重锁（2026-10-30）
+
+为保留原有可用版本，新增独立脚本 [`track_obs_rotation_partial_board.py`](../../host/pose/track_obs_rotation_partial_board.py)，没有用它覆盖 [`track_obs_rotation_continuous.py`](../../host/pose/track_obs_rotation_continuous.py)。新脚本启动时仍先要求完整 9×6 棋盘建立角点编号和方向；建立初始锁定后，正常运行可用部分角点跟踪。跟踪置信度不足时不发送新矩阵，FPGA 保持最后一次已接受的矩阵；跟踪丢失后会尝试从可见的 6×4、4×3 局部棋盘格重锁，并可回退到完整棋盘检测。
+
+用户在 OBS 虚拟摄像机 `source=2`、COM7／115200 baud 下进行了实时验证，固定参考图为 `picture/Calibration/00.png`，检测到的参考网格角为 `+0.634°`。运行输出多次显示 `mode=partial-board tracking`，角点数从 `8/12`、`10/12` 到 `45/54` 不等；丢失后出现 `partial-board relock 4x3` 和 `partial-board relock 6x4`，随后又恢复部分角点跟踪。一次连续运行累计接受 1,395 次更新，停止时报告角度 `-5.472°`。因此部分棋盘跟踪与局部网格重锁已在用户设备上实际运行；日志同时仍有间歇性的 `partial-board tracking lost`，低置信度时会保持 FPGA 上次矩阵。当前结果确认可用性和恢复能力，不代表角度精度或 FPGA 校正效果已用已知角度基准量化验收。
+
+在 `Distortion-correction/` 目录运行：
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\track_obs_rotation_partial_board.py --source 2 --port COM7
+```
+
+默认参考图和标定 JSON 沿用固定参考测角脚本的配置。该流程仍只估计棋盘格所在像平面的旋转；启动时需要完整棋盘，后续才支持部分棋盘持续跟踪和重锁。用户反馈整体表现“好像可以了”，后续可重点观察实际转动时角度是否连续、重锁时是否出现可见跳变，并用量角器记录已知角度误差。
