@@ -2,9 +2,9 @@
 
 ## 5 号标定参数对照副本（2026-10-30）
 
-本工程从已验证稳定的 `stage11_curve1to4_refit_test` 复制。0–4 号保持稳定版本，5 号使用标定候选 `gamma=0.65, knee=120, power=2.80`。相对源副本，RTL ROM 只改变 LUT 5。构建位流用于检查只改变 5 号表后，无 UART 参数时输出是否抖动。
+本工程从已验证稳定的 `stage11_curve1to4_refit_test` 复制。0–4 号保持稳定版本，5 号使用标定参数 `gamma=0.65, knee=120, power=2.80`。相对源副本，RTL ROM 只改变 LUT 5。板上验证已通过：无 UART 参数时显示稳定，未观察到抖动。
 
-本副本已于 2026-10-30 完成 PDS 综合、布局布线和位流生成；41969 条网络全部布通。时序报告为 `All Constraints Met`，慢角 `ddrphy_sysclk` setup WNS `+0.085 ns`、TNS 0、失败端点 0。位流为 `generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit`（9,188,552 字节，SHA-256 `25C6443F854D484E3EE427C7DBB3BCA2D2E4E855C3E6EC54853951EDF566549D`）。此位流尚待板上观察确认画面是否抖动；时序报告不能替代实测。
+本副本已于 2026-10-30 完成 PDS 综合、布局布线和位流生成；41969 条网络全部布通。时序报告为 `All Constraints Met`，慢角 `ddrphy_sysclk` setup WNS `+0.085 ns`、TNS 0、失败端点 0。位流为 `generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit`（9,188,552 字节，SHA-256 `25C6443F854D484E3EE427C7DBB3BCA2D2E4E855C3E6EC54853951EDF566549D`）。用户已确认该位流板上验证通过，无 UART 参数时画面没有抖动。
 
 ## 1–4 号曲线样本拟合副本（2026-10-30）
 

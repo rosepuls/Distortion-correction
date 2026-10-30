@@ -149,5 +149,5 @@ Stage 11 接口已固定并接入 RTL：65 字节版本 `02` 的偏移 43 为曲
 - 关闭 PDS 后确认当前正式目录名为 `stage11_720p60hz_adaptive_image_enhancement_calibrated_baseline`；新目录的 `.fic` 已指向该目录下的综合 ADF，位流哈希与刚完成的构建一致。
 - 当前最新候选工程为 `fpga/project/stage11_720p60hz_adaptive_image_enhancement_calibrated_baseline`。它从已验证稳定的 `stage11_curve1to4_refit_test` 完整复制，仅将 LUT 5 更新为 lighting_samples 标定值 `gamma=0.65, knee=120, power=2.80`；LUT 0–4 保持稳定副本的值。参数记录在工程根目录 `lighting_curve_parameters.json`。
 - 已完成 PDS 综合、布局布线和位流生成，41969/41969 条网络布通。报告 `Design Summary : All Constraints Met`；慢角 `ddrphy_sysclk` setup WNS `+0.085 ns`、TNS 0、失败端点 0。该最小裕量较小，且报告不覆盖未设置外部约束的 HDMI/DDR/UART I/O。
-- 当前位流为 `fpga/project/stage11_720p60hz_adaptive_image_enhancement_calibrated_baseline/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit`，大小 9,188,552 字节，SHA-256 `25C6443F854D484E3EE427C7DBB3BCA2D2E4E855C3E6EC54853951EDF566549D`；烧录时使用同目录配套 `.fic`。板上无 UART 参数时画面是否抖动仍待验证，因此该工程是当前最新测试基准，不代表曲线 5 已通过实板验收。
-- 前文“明天第一步”中的 5 号重算和位流生成已完成，由本节的新基准记录取代；下一步是在板上用此 `.sbit/.fic` 观察无 UART 时的画面，并记录复现结果。原 Stage11 工程未被修改。
+- 当前位流为 `fpga/project/stage11_720p60hz_adaptive_image_enhancement_calibrated_baseline/generate_bitstream/HDMI_IN_DDR3_HDMI_OUT_top.sbit`，大小 9,188,552 字节，SHA-256 `25C6443F854D484E3EE427C7DBB3BCA2D2E4E855C3E6EC54853951EDF566549D`；烧录时使用同目录配套 `.fic`。用户已确认板上验证通过：无 UART 参数时画面稳定、没有抖动。该工程是当前最新且通过此项稳定性验证的基准；其他光照场景的主观画质仍可继续评估。
+- 前文“明天第一步”中的 5 号重算、位流生成和无 UART 稳定性验证均已完成。原 Stage11 工程未被修改。
