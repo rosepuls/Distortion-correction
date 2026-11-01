@@ -414,3 +414,9 @@ PDS 已完成综合、布线、FIC 核插入和位流生成，报告为 `All Con
 
 两项 FIFO 版本整链 16×16 输出逐值匹配 `block1_output_u8.hex`，metadata、帧标志和不规则输出背压回归 PASS。PDS 完成 compile/synthesis/device map/P&R/post-PNR report，报告 `All Constraints Met`：慢角 setup WNS **+1.075 ns**、TNS 0，hold WHS **+0.141 ns**，估算最高频率 **144.40 MHz**。布线资源约 **267 APM、12 DRM、8060 LUT、12614 FF**，相较单项 FIFO 增约 208 个 FF。原 pointwise→depthwise 跨层 ready 最差路径消失；当前最差路径转到 feature FIFO 占用计数，经 stem 的 ready 级联到 stem MAC APM enable，共 11 个逻辑级、数据路径约 6.49 ns（约 69% 为布线）。报告为 `report_timing/sr_stem_depthwise_synth_top.rtr`，日志 `sr-throughput-pds-final.log`。时钟仅约束为 8 ns，顶层 I/O 延时未约束；整帧吞吐仍未测量，因此“同拍入队/出队”是 FIFO 边界能力，不等于已验证整条 CNN 帧率。
 
+## Stage13 运动防抖 FPGA 估计器路线（2026-11-01）
+
+独立测试目录为 `fpga/project/stage13_motion_estimator_sad_test/`，目前为空。计划以低分辨率灰度块匹配 SAD 估计相邻输入帧的全局平移，再进行离群块筛选、置信度判断、路径低通、静止死区和每轴 ±24 px 限幅，最终在输出帧边界接入现有源采样坐标补偿接口。SAD 模块尚未实现，Stage12 超分辨率链路与此计划分别验证。
+
+实施顺序：先核对现有 Stage13 校正通路与位移方向；建立 Python SAD 参考并确定下采样、块大小、搜索范围及可信度规则；估算双帧 RAM、SAD 运算量和 720p60 时序余量；然后在独立工程中实现灰度双帧采集、块匹配、全局位移筛选和定点稳定化；最后逐帧比对软件与 RTL，完成 PDS 时序及板上帧率、画面和延迟验证。每一步的输入输出约定、验收条件和工程边界见[运动防抖完整实施顺序](sports-stabilization.md#2026-11-01stage13-fpga-自主运动防抖估计计划)。
+
