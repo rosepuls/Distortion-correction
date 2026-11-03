@@ -44,8 +44,8 @@ endmodule
 // 32x4 RGBX8888 Tile Cache.
 // Four synchronous 128-bit banks serve one 2x2 neighborhood in parallel.
 module pixel_tile_cache #(
-    parameter integer IMAGE_WIDTH = 1920,
-    parameter integer IMAGE_HEIGHT = 1080,
+    parameter integer IMAGE_WIDTH = 1280,
+    parameter integer IMAGE_HEIGHT = 720,
     parameter integer TILE_W = 32,
     parameter integer TILE_H = 4,
     parameter integer SET_COUNT = 16,

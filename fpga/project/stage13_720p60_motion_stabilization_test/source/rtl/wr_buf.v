@@ -22,8 +22,8 @@
 module wr_buf #(
     parameter                     ADDR_WIDTH      = 6'd27,
     parameter                     ADDR_OFFSET     = 32'h0000_0000,
-    parameter                     H_NUM           = 12'd1920,
-    parameter                     V_NUM           = 12'd1080,
+    parameter                     H_NUM           = 12'd1280,
+    parameter                     V_NUM           = 12'd720,
     parameter                     DQ_WIDTH        = 12'd32,
     parameter                     LEN_WIDTH       = 12'd16,
     parameter                     PIX_WIDTH       = 12'd24,
