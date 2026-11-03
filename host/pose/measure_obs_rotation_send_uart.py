@@ -19,6 +19,9 @@ import cv2
 import numpy as np
 import serial
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from verification.device_config import load_device_config
+
 from analyze_parallel_rotation import (
     load_calibration as load_rotation_calibration,
     quantize,
@@ -45,10 +48,12 @@ def parse_source(value: str) -> int | str:
 
 
 def parse_args() -> argparse.Namespace:
+    devices = load_device_config()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=parse_source, default=2,
-                        help="OBS Virtual Camera device index (default 2) or video path")
-    parser.add_argument("--port", default="COM7", help="USB-UART port (default COM7)")
+    parser.add_argument("--source", type=parse_source, default=devices["obs_virtual_camera_index"],
+                        help="OBS Virtual Camera index from device_config.json or video path")
+    parser.add_argument("--port", default=devices["uart_port"],
+                        help="USB-UART port from device_config.json")
     parser.add_argument("--calibration", type=Path, default=DEFAULT_CALIBRATION,
                         help="camera calibration JSON")
     parser.add_argument("--sequence", type=int,

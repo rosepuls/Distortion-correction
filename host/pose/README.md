@@ -1,5 +1,17 @@
 # 上位机姿态估计
 
+## Stage13 运动防抖原型
+
+[`stage13_motion_stabilization.py`](stage13_motion_stabilization.py) 从 OBS/UVC 连续帧用稀疏 Lucas–Kanade 光流估算全局平移，并以前后向一致性和中位数共识抑制坏点及局部运动。脚本积分相邻帧位移得到图像路径，再对路径做低通；`path - trend` 形成限幅的采样坐标补偿，与光流测得的图像位移同号，因为 FPGA 把偏移加到源取样坐标。持续平移因此只产生趋于稳定的偏移，不会持续抵消每帧移动。输入保持原宽高比缩放到 FPGA 坐标画布（默认 1280×720），多出的区域补黑边，避免将 4:3 摄像头画面拉伸为 16:9；dx/dy 按 FPGA 坐标画布的像素计。图像本身无法判断操作者意图，因此快速主动运动仍可能被当作抖动。
+
+先用合成视频或 OBS 执行 dry-run，查看 `motion`、`trend`、`correction` 和置信度，不打开串口。默认拒绝低于 `0.25` 的置信度，以及模长超过 `40 px/frame` 的全局位移，避免低置信度大跳变污染累计路径；日志会分别累计跟踪失败、置信度不足和位移超限次数；静止死区默认 `0.10 px/frame`：
+
+```powershell
+.\.venv\Scripts\python.exe host\pose\stage13_motion_stabilization.py --dry-run --display
+```
+
+Stage13 UART 包沿用 65 字节 v2 头、序号和 CRC；字节 43 保留增强曲线 ID，标志位 bit 1 表示平移有效，字节 44–47 与 48–51 分别为有符号小端 Q16.16 dx/dy，52–62 保留为零。发送时 bit 0 清零，避免用脚本默认矩阵覆盖 FPGA 当前单应矩阵。Stage13 RTL 已支持该扩展，单轴范围为 ±24 源像素，参数在帧边界生效。去掉 `--dry-run` 后脚本会打开默认 COM7 并发送；默认视频源为 OBS Virtual Camera 2。位流已生成，但还未完成板上 UART/画面验证。
+
 `pose/` 负责从原始 UVC 图像估计棋盘格相对零位的相机姿态。它读取 `host/calibration/calibrate.py` 产生的 `calibration.json`，在运行时输出平移、相对旋转矩阵和 XYZ 欧拉角 JSON Lines。它不对视频帧做畸变矫正，也不通过 UART 下发参数。
 
 在真实标定参数和相机姿态数据准备好之前，可先用 [`render_rotation_reference.py`](render_rotation_reference.py) 检查画面内旋转的逆向坐标约定和裁剪范围。该脚本默认自行生成 1280×720 合成棋盘格，因此不依赖相机或标定文件。

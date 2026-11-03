@@ -1,10 +1,17 @@
 param(
-    [string]$Com = 'COM7',
+    [string]$Com = '',
     [ValidateRange(0, 65535)][int]$Sequence = 100,
     [ValidateRange(0, 5)][int]$ProfileId = 2
 )
 
 $ErrorActionPreference = 'Stop'
+$deviceConfigPath = Join-Path $PSScriptRoot '..\..\..\..\host\verification\device_config.json'
+$deviceConfig = Get-Content -LiteralPath $deviceConfigPath -Raw | ConvertFrom-Json
+if (-not $Com) {
+    $Com = [string]$deviceConfig.uart_port
+} elseif ($Com -ne [string]$deviceConfig.uart_port) {
+    Write-Warning "Explicit -Com $Com overrides shared device config $($deviceConfig.uart_port)."
+}
 $packetBuilder = Join-Path $PSScriptRoot 'Build-UartPacket.ps1'
 $hex = & $packetBuilder -Sequence $Sequence -PoseValid $true -ProfileId $ProfileId
 $tx = [byte[]]@($hex -split '\s+' | ForEach-Object { [Convert]::ToByte($_, 16) })

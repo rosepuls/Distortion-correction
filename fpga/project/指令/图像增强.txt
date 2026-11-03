@@ -1,0 +1,10 @@
+样本采集
+& 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\.venv\Scripts\python.exe' 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\host\pose\capture_lighting_samples.py' --source 2
+单次调整
+& 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\fpga\project\stage11_720p60hz_adaptive_image_enhancement_test\sim\Run-UartEnhancementProfile.ps1' -Com COM7 -Sequence 103 -ProfileId 4
+
+实时调整无棋盘
+& 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\.venv\Scripts\python.exe' 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\host\pose\track_obs_adaptive_enhancement.py' --source 2 --port COM7 --identity
+
+实时调整要棋盘
+& 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\.venv\Scripts\python.exe' 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\host\pose\track_obs_adaptive_enhancement.py' --source 2 --port COM7

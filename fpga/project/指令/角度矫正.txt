@@ -1,0 +1,63 @@
+完整棋盘
+& 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\.venv\Scripts\python.exe' 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\host\pose\track_obs_rotation_continuous.py' --source 2 --port COM7
+
+半完整棋盘实时矫正
+& 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\.venv\Scripts\python.exe' 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\host\pose\track_obs_rotation_partial_board.py' --source 2 --port COM7
+
+
+角度矫正评估
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+.\.venv\Scripts\python.exe host\pose\verify_live_rotation.py
+现在运行脚本后只显示两路预览，不会自动测量、下发矩阵或写日志。在转台 0° 时按 z 设置零位；之后每到一个角度，调好滑块并按一次 空格，脚本才测量一次，并向终端和 measurements.jsonl 写入一条结果。
+
+
+$proj = 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\fpga\project\stage8_720p60hz_bilinear_uart_angle_correction_65byte'
+$com = 'COM7'  # 改成实际端口
+
+$words = @(
+    '0000DDB4', '00008000', 'FFA1BE66',
+    'FFFF8000', '0000DDB4', '01703B19',
+    '00000000', '00000000', '40000000'
+)
+
+# 生成协议版本 02 的 65 字节请求帧
+$hex = & (Join-Path $proj 'sim\Build-UartPacket.ps1') -Sequence 2 -Words $words
+$tx = [byte[]]@($hex -split '\s+' | ForEach-Object { [Convert]::ToByte($_, 16) })
+
+if ($tx.Length -ne 65) {
+    throw "请求帧长度错误：得到 $($tx.Length) 字节，应为 65 字节。"
+}
+
+$port = [System.IO.Ports.SerialPort]::new($com, 115200, 'None', 8, 'One')
+$port.ReadTimeout = 5000
+
+try {
+    $port.Open()
+    $port.DiscardInBuffer()
+    $port.Write($tx, 0, $tx.Length)
+
+    $rx = New-Object byte[] 65
+    $count = 0
+    while ($count -lt 65) {
+        $count += $port.Read($rx, $count, 65 - $count)
+    }
+
+    'RX: ' + (($rx | ForEach-Object { $_.ToString('X2') }) -join ' ')
+
+    if ($rx[0] -ne 0xA5 -or $rx[1] -ne 0x5A -or
+        $rx[2] -ne 0x02 -or $rx[3] -ne 0x81) {
+        throw '响应帧头、协议版本或响应类型不匹配。'
+    }
+
+    if ($rx[4] -ne 0x02 -or $rx[5] -ne 0x00) {
+        throw '响应序号不匹配。'
+    }
+
+    "ACK status: $($rx[6]) (0 means accepted)"
+}
+finally {
+    $port.Dispose()
+}
+
+
+

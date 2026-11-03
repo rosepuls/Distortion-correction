@@ -59,6 +59,10 @@ module cached_neighbor_reader #(
     output wire         fatal_fault,
     output wire [15:0]  read_error_count,
     output wire [31:0]  fetched_rows,
+    // [0] metadata FIFO full, [1] response capacity, [2] miss/retry,
+    // [3] invalidation, [4] refill active, [5] capacity consumed by
+    // in-flight cache pipeline reservations before the response FIFO is full.
+    output wire [5:0]   diagnostic_lookup_block_reason,
     output wire [23:0]  diagnostic_miss_count,
     output wire [23:0]  diagnostic_fill_cycles,
     output wire         read_response_wait,
@@ -89,6 +93,7 @@ module cached_neighbor_reader #(
     wire [9:0] base_y = (s_y0 >= IMAGE_HEIGHT-1) ? IMAGE_HEIGHT-2 : s_y0;
     wire [31:0] c00, c10, c01, c11;
     wire cache_lookup_ready, cache_rsp_valid, cache_rsp_ready;
+    wire [4:0] cache_lookup_block_reason;
     wire cache_coord_valid, cache_hit;
     wire cache_fill_valid, cache_fill_ready;
     wire [11:0] cache_tile_x, cache_tile_y;
@@ -103,6 +108,12 @@ module cached_neighbor_reader #(
     wire fifo_space = count < META_DEPTH;
     wire accept = s_valid && s_ready;
     wire response = m_valid && m_ready;
+    wire cache_lookup_valid = s_valid && fifo_space && rstn
+        && !source_frame_start && !fatal_fault;
+    assign diagnostic_lookup_block_reason = {
+        cache_lookup_block_reason[4], cache_lookup_block_reason[3:0],
+        (s_valid && !fifo_space)
+    };
 
     function automatic [31:0] select_pixel;
         input [1:0] which;
@@ -191,7 +202,7 @@ module cached_neighbor_reader #(
         .BANK_READ_LATENCY(BANK_READ_LATENCY)
     ) cache (
         .clk(clk), .rst_n(rstn), .invalidate(cache_invalidate),
-        .lookup_valid(accept), .lookup_ready(cache_lookup_ready),
+        .lookup_valid(cache_lookup_valid), .lookup_ready(cache_lookup_ready),
         .lookup_x0({1'b0, base_x}), .lookup_y0({2'b0, base_y}),
         .lookup_rsp_valid(cache_rsp_valid), .lookup_rsp_ready(cache_rsp_ready),
         .pixel_p00(c00), .pixel_p10(c10), .pixel_p01(c01), .pixel_p11(c11),
@@ -202,6 +213,7 @@ module cached_neighbor_reader #(
         .fill_data_valid(adapter_data_valid), .fill_data_ready(adapter_data_ready),
         .fill_data(adapter_data), .fill_data_row_index(adapter_row),
         .fill_data_beat_index(adapter_beat),
+        .diagnostic_lookup_block_reason(cache_lookup_block_reason),
         .diagnostic_miss_count(cache_miss_count),
         .diagnostic_fill_cycles(cache_fill_cycles)
     );

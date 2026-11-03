@@ -1,0 +1,47 @@
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+明天接好采集卡、启动 OBS 虚拟相机后，先运行：
+.\.venv\Scripts\python.exe host\verification\configure_devices.py --scan --preview
+看黄色编号的预览，确认 OBS 原图和 FPGA HDMI 输出各是哪个索引。若仍为 OBS 2、HDMI 1，直接运行原命令；若 HDMI 变为 3，运行一次：
+.\.venv\Scripts\python.exe host\verification\configure_devices.py --set-obs 2 --set-hdmi 3
+
+
+
+视频流检验
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+.\.venv\Scripts\python.exe host\pose\preview_hdmi_usb_capture.py
+
+
+图片矫正验证
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+.\.venv\Scripts\python.exe host\verification\measure_hdmi_sfr.py --image-id 0 --width 1280 --height 720
+每换一张原图，把 --image-id 依次改为 1 到 7。这个编号用于标记结果和匹配原图；脚本采集的是当时 FPGA 输出的画面。
+
+
+
+角度矫正评估
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+.\.venv\Scripts\python.exe host\pose\verify_live_rotation.py
+现在运行脚本后只显示两路预览，不会自动测量、下发矩阵或写日志。在转台 0° 时按 z 设置零位；之后每到一个角度，调好滑块并按一次 空格，脚本才测量一次，并向终端和 measurements.jsonl 写入一条结果
+
+
+图像增强评估
+& 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction\fpga\project\stage11_720p60hz_adaptive_image_enhancement_test\sim\Run-UartEnhancementProfile.ps1' -Com COM7 -Sequence 103 -ProfileId 0
+每次手动运行时让 Sequence 和 ProfileId 都加 1 即可：从 Sequence 103 / ProfileId 0 开始，到 Sequence 108 / ProfileId 5 结束。每次确认收到 ACK 后再运行下一条。
+
+
+运动防抖评估
+在 Distortion-correction 目录，先测关闭补偿的基线，再用相同场景测开启补偿：
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+.\.venv\Scripts\python.exe host\pose\verify_motion_stabilization.py --mode fixed --control off
+.\.venv\Scripts\python.exe host\pose\verify_motion_stabilization.py --mode fixed --control on
+程序启动后只预览 OBS 和 HDMI 采集画面。按 空格开始测量，再按一次结束；q 退出。
+
+图片
+
+系统搭建全景：开发板、视频输入设备、显示器及连线；拍一张正面、一张斜 45° 全景。文档中有多个对应占位。
+板卡连接与运行现场：清晰拍到板卡接口、HDMI/UART/电源连接，以及显示器上的 FPGA 输出。可与系统全景合并，但接口需看得清。
+畸变校正配对图：同一张标定网格的原始输入图与 FPGA 校正输出图，固定相机和采集卡设置，按相同分辨率保存。后续应验证网格直线残差、黑边/有效区域，不能只凭观感判断。
+运动补偿对照图：同一场景、同一位流下的补偿关闭与开启输出；配一张相机/场景运动过程图，或记录位移曲线及实际运动方向。文档特别指出当前 ±24 px 源码还需匹配位流验收。
+RGB LUT 增强对照图：同一输入场景的旁路图与增强图；覆盖文档提到的弱光、高光、混合光照，并比较六条增强曲线。需记录曲线编号和参数，避免把设计曲线效果当成实测结果。
+防抖测试场景与位移曲线：固定场景下进行已知方向/幅度的移动，记录补偿前后位移或抖动变化；当前文档仍标为待补实拍/测量。
+UART 联调证据：参数发送、ACK 日志和对应 FPGA 输出画面截图，能看出使用的参数及其生效结果。

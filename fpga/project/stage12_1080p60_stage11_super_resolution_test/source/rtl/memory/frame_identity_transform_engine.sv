@@ -62,6 +62,7 @@ module frame_identity_transform_engine #(
     output reg  [23:0]  perf_coord_stall_cycles,
     output reg  [23:0]  perf_cache_miss_count,
     output reg  [23:0]  perf_cache_fill_cycles,
+    output reg  [23:0]  perf_output_backpressure_cycles,
     output reg  [23:0]  perf_read_ar_wait_cycles,
     output reg  [23:0]  perf_read_response_wait_cycles,
     output reg  [23:0]  perf_write_wait_cycles,
@@ -69,7 +70,13 @@ module frame_identity_transform_engine #(
     output reg  [23:0]  perf_read_arbiter_wait_cycles,
     output reg  [23:0]  perf_read_arready_wait_cycles,
     output reg  [23:0]  perf_read_first_beat_wait_cycles,
-    output reg  [23:0]  perf_read_interbeat_wait_cycles
+    output reg  [23:0]  perf_read_interbeat_wait_cycles,
+    output reg  [20:0]  perf_reader_meta_fifo_stall_cycles,
+    output reg  [20:0]  perf_cache_fill_block_cycles,
+    output reg  [20:0]  perf_cache_invalidate_block_cycles,
+    output reg  [20:0]  perf_cache_retry_miss_block_cycles,
+    output reg  [20:0]  perf_cache_capacity_block_cycles,
+    output reg  [20:0]  perf_cache_capacity_pipe_block_cycles
 );
     localparam integer PIXELS_PER_FRAME = OUTPUT_WIDTH * OUTPUT_HEIGHT;
     localparam integer PIXELS_PER_BURST = 128;
@@ -107,8 +114,16 @@ module frame_identity_transform_engine #(
     reg [23:0] interbeat_wait_count;
     reg [23:0] write_wait_count;
     reg [23:0] write_phase_count;
+    reg [23:0] output_backpressure_count;
+    reg [20:0] reader_meta_fifo_stall_count;
+    reg [20:0] cache_fill_block_count;
+    reg [20:0] cache_invalidate_block_count;
+    reg [20:0] cache_retry_miss_block_count;
+    reg [20:0] cache_capacity_block_count;
+    reg [20:0] cache_capacity_pipe_block_count;
     wire [23:0] pipeline_diag_miss_count;
     wire [23:0] pipeline_diag_fill_cycles;
+    wire [5:0] pipeline_lookup_block_reason;
     wire pipeline_read_response_wait;
     wire pipeline_first_beat_wait, pipeline_interbeat_wait;
 
@@ -227,6 +242,7 @@ module frame_identity_transform_engine #(
         .reader_idle(reader_idle), .reader_fault(reader_fault),
         .read_error_count(tile_read_errors),
          .fetched_rows(fetched_rows), .fifo_level(fifo_level),
+         .diagnostic_lookup_block_reason(pipeline_lookup_block_reason),
          .diagnostic_miss_count(pipeline_diag_miss_count),
          .diagnostic_fill_cycles(pipeline_diag_fill_cycles),
          .read_response_wait(pipeline_read_response_wait),
@@ -263,10 +279,18 @@ module frame_identity_transform_engine #(
             interbeat_wait_count <= 24'd0;
             write_wait_count <= 24'd0;
             write_phase_count <= 24'd0;
+            output_backpressure_count <= 24'd0;
+            reader_meta_fifo_stall_count <= 21'd0;
+            cache_fill_block_count <= 21'd0;
+            cache_invalidate_block_count <= 21'd0;
+            cache_retry_miss_block_count <= 21'd0;
+            cache_capacity_block_count <= 21'd0;
+            cache_capacity_pipe_block_count <= 21'd0;
             perf_frame_cycles <= 24'd0;
             perf_coord_stall_cycles <= 24'd0;
             perf_cache_miss_count <= 24'd0;
             perf_cache_fill_cycles <= 24'd0;
+            perf_output_backpressure_cycles <= 24'd0;
             perf_read_ar_wait_cycles <= 24'd0;
             perf_read_response_wait_cycles <= 24'd0;
             perf_write_wait_cycles <= 24'd0;
@@ -275,6 +299,12 @@ module frame_identity_transform_engine #(
             perf_read_arready_wait_cycles <= 24'd0;
             perf_read_first_beat_wait_cycles <= 24'd0;
             perf_read_interbeat_wait_cycles <= 24'd0;
+            perf_reader_meta_fifo_stall_cycles <= 21'd0;
+            perf_cache_fill_block_cycles <= 21'd0;
+            perf_cache_invalidate_block_cycles <= 21'd0;
+            perf_cache_retry_miss_block_cycles <= 21'd0;
+            perf_cache_capacity_block_cycles <= 21'd0;
+            perf_cache_capacity_pipe_block_cycles <= 21'd0;
             copy_done <= 1'b0;
             copy_error <= 1'b0;
             fatal_fault <= 1'b0;
@@ -289,6 +319,24 @@ module frame_identity_transform_engine #(
             if (state == COLLECT && pipeline_s_valid && !pipeline_s_ready &&
                 coord_stall_count != 24'hffffff)
                 coord_stall_count <= coord_stall_count + 1'b1;
+            if (state == COLLECT && pipeline_lookup_block_reason[0] &&
+                reader_meta_fifo_stall_count != 21'h1fffff)
+                reader_meta_fifo_stall_count <= reader_meta_fifo_stall_count + 1'b1;
+            if (state == COLLECT && pipeline_lookup_block_reason[4] &&
+                cache_fill_block_count != 21'h1fffff)
+                cache_fill_block_count <= cache_fill_block_count + 1'b1;
+            if (state == COLLECT && pipeline_lookup_block_reason[3] &&
+                cache_invalidate_block_count != 21'h1fffff)
+                cache_invalidate_block_count <= cache_invalidate_block_count + 1'b1;
+            if (state == COLLECT && pipeline_lookup_block_reason[2] &&
+                cache_retry_miss_block_count != 21'h1fffff)
+                cache_retry_miss_block_count <= cache_retry_miss_block_count + 1'b1;
+            if (state == COLLECT && pipeline_lookup_block_reason[1] &&
+                cache_capacity_block_count != 21'h1fffff)
+                cache_capacity_block_count <= cache_capacity_block_count + 1'b1;
+            if (state == COLLECT && pipeline_lookup_block_reason[5] &&
+                cache_capacity_pipe_block_count != 21'h1fffff)
+                cache_capacity_pipe_block_count <= cache_capacity_pipe_block_count + 1'b1;
             if (read_valid && !read_ready && read_ar_wait_count != 24'hffffff)
                 read_ar_wait_count <= read_ar_wait_count + 1'b1;
             if (pipeline_read_response_wait &&
@@ -309,6 +357,9 @@ module frame_identity_transform_engine #(
             if ((write_state == WR_AW || write_state == WR_DATA) &&
                 write_phase_count != 24'hffffff)
                 write_phase_count <= write_phase_count + 1'b1;
+            if (state == COLLECT && pipeline_m_valid && !pipeline_m_ready &&
+                output_backpressure_count != 24'hffffff)
+                output_backpressure_count <= output_backpressure_count + 1'b1;
             if (state == IDLE || progress)
                 stall_count <= 32'd0;
             else if (stall_count != 32'hffffffff)
@@ -367,6 +418,13 @@ module frame_identity_transform_engine #(
                         interbeat_wait_count <= 24'd0;
                         write_wait_count <= 24'd0;
                         write_phase_count <= 24'd0;
+                        output_backpressure_count <= 24'd0;
+                        reader_meta_fifo_stall_count <= 21'd0;
+                        cache_fill_block_count <= 21'd0;
+                        cache_invalidate_block_count <= 21'd0;
+                        cache_retry_miss_block_count <= 21'd0;
+                        cache_capacity_block_count <= 21'd0;
+                        cache_capacity_pipe_block_count <= 21'd0;
                         state <= START_FRAME;
                     end else begin
                         fatal_fault <= 1'b1;
@@ -428,6 +486,7 @@ module frame_identity_transform_engine #(
                         perf_coord_stall_cycles <= coord_stall_count;
                         perf_cache_miss_count <= pipeline_diag_miss_count;
                         perf_cache_fill_cycles <= pipeline_diag_fill_cycles;
+                        perf_output_backpressure_cycles <= output_backpressure_count;
                         perf_read_ar_wait_cycles <= read_ar_wait_count;
                         perf_read_response_wait_cycles <= read_response_wait_count;
                         perf_write_wait_cycles <= write_wait_count;
@@ -436,6 +495,12 @@ module frame_identity_transform_engine #(
                         perf_read_arready_wait_cycles <= read_arready_wait_count;
                         perf_read_first_beat_wait_cycles <= first_beat_wait_count;
                         perf_read_interbeat_wait_cycles <= interbeat_wait_count;
+                        perf_reader_meta_fifo_stall_cycles <= reader_meta_fifo_stall_count;
+                        perf_cache_fill_block_cycles <= cache_fill_block_count;
+                        perf_cache_invalidate_block_cycles <= cache_invalidate_block_count;
+                        perf_cache_retry_miss_block_cycles <= cache_retry_miss_block_count;
+                        perf_cache_capacity_block_cycles <= cache_capacity_block_count;
+                        perf_cache_capacity_pipe_block_cycles <= cache_capacity_pipe_block_count;
                         state <= IDLE;
                     end else begin
                         fatal_fault <= 1'b1;

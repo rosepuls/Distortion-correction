@@ -1,0 +1,255 @@
+{
+  "format": "pango-sr-int8-activation-reference-v1",
+  "checkpoint_sha256": "6b60b40506ea6c8c57360f9a81c8d8bf86a87d8706da91388cbb0e48d051de1d",
+  "manifest_sha256": "0b1d0fac56b443d9765eac5f3ee471dd2f1dacb90b03f13570674bdcd5e9fd9a",
+  "files": {
+    "stem": {
+      "weights": "stem_weights_s8.hex",
+      "bias": "stem_bias_s32.hex",
+      "requant_multiplier": "stem_requant_q31.hex",
+      "requant_shift": "stem_requant_shift.hex",
+      "weight_shape": [
+        8,
+        1,
+        3,
+        3
+      ],
+      "input_scale": 1.0,
+      "output_scale": 1.1847084195006128,
+      "requant_multiplier_q31": [
+        1490371584,
+        1221191296,
+        1342401536,
+        1416192512,
+        1815515648,
+        1190966016,
+        2079188608,
+        1105467008
+      ],
+      "requant_right_shift": [
+        39,
+        39,
+        39,
+        39,
+        40,
+        39,
+        40,
+        39
+      ],
+      "worst_case_mac_bound": 32580
+    },
+    "block1_depthwise": {
+      "weights": "block1_depthwise_weights_s8.hex",
+      "bias": "block1_depthwise_bias_s32.hex",
+      "requant_multiplier": "block1_depthwise_requant_q31.hex",
+      "requant_shift": "block1_depthwise_requant_shift.hex",
+      "weight_shape": [
+        8,
+        1,
+        3,
+        3
+      ],
+      "input_scale": 1.1847084195006128,
+      "output_scale": 0.4260980942670037,
+      "requant_multiplier_q31": [
+        1879178368,
+        1979212544,
+        1243961856,
+        1401255936,
+        1899268608,
+        1986508928,
+        1375145600,
+        2084494208
+      ],
+      "requant_right_shift": [
+        38,
+        38,
+        37,
+        38,
+        38,
+        38,
+        37,
+        38
+      ],
+      "worst_case_mac_bound": 291583
+    },
+    "block1_pointwise": {
+      "weights": "block1_pointwise_weights_s8.hex",
+      "bias": "block1_pointwise_bias_s32.hex",
+      "requant_multiplier": "block1_pointwise_requant_q31.hex",
+      "requant_shift": "block1_pointwise_requant_shift.hex",
+      "weight_shape": [
+        8,
+        8,
+        1,
+        1
+      ],
+      "input_scale": 0.4260980942670037,
+      "output_scale": 0.255349671606924,
+      "requant_multiplier_q31": [
+        1712546560,
+        1304324992,
+        1591389952,
+        1921495296,
+        1650124928,
+        1254241792,
+        1787806208,
+        1616120192
+      ],
+      "requant_right_shift": [
+        38,
+        38,
+        38,
+        38,
+        38,
+        38,
+        38,
+        38
+      ],
+      "worst_case_mac_bound": 259499
+    },
+    "block2_depthwise": {
+      "weights": "block2_depthwise_weights_s8.hex",
+      "bias": "block2_depthwise_bias_s32.hex",
+      "requant_multiplier": "block2_depthwise_requant_q31.hex",
+      "requant_shift": "block2_depthwise_requant_shift.hex",
+      "weight_shape": [
+        8,
+        1,
+        3,
+        3
+      ],
+      "input_scale": 1.217636048560049,
+      "output_scale": 0.6866226495481005,
+      "requant_multiplier_q31": [
+        1435583232,
+        1453119616,
+        1967538432,
+        1571970560,
+        1199436544,
+        1439888000,
+        1431107456,
+        1658534656
+      ],
+      "requant_right_shift": [
+        38,
+        38,
+        38,
+        38,
+        38,
+        38,
+        38,
+        38
+      ],
+      "worst_case_mac_bound": 291551
+    },
+    "block2_pointwise": {
+      "weights": "block2_pointwise_weights_s8.hex",
+      "bias": "block2_pointwise_bias_s32.hex",
+      "requant_multiplier": "block2_pointwise_requant_q31.hex",
+      "requant_shift": "block2_pointwise_requant_shift.hex",
+      "weight_shape": [
+        8,
+        8,
+        1,
+        1
+      ],
+      "input_scale": 0.6866226495481005,
+      "output_scale": 0.39205875770718446,
+      "requant_multiplier_q31": [
+        1894430592,
+        1192171648,
+        1194322048,
+        1862555648,
+        1171064448,
+        1734657664,
+        1208732928,
+        1078507008
+      ],
+      "requant_right_shift": [
+        38,
+        37,
+        37,
+        38,
+        37,
+        38,
+        37,
+        37
+      ],
+      "worst_case_mac_bound": 259250
+    },
+    "phase_head": {
+      "weights": "phase_head_weights_s8.hex",
+      "bias": "phase_head_bias_s32.hex",
+      "requant_multiplier": "phase_head_requant_q31.hex",
+      "requant_shift": "phase_head_requant_shift.hex",
+      "weight_shape": [
+        9,
+        32,
+        1,
+        1
+      ],
+      "input_scale": 1.2938466988357844,
+      "output_scale": 0.21537932448499786,
+      "requant_multiplier_q31": [
+        1667028992,
+        1313372160,
+        1618794624,
+        1273040512,
+        1465990400,
+        1272800640,
+        1805287936,
+        1222403584,
+        1915224960
+      ],
+      "requant_right_shift": [
+        38,
+        38,
+        38,
+        38,
+        39,
+        38,
+        38,
+        38,
+        38
+      ],
+      "worst_case_mac_bound": 1036534
+    }
+  },
+  "activation_scales": {
+    "stem": 1.1847084195006128,
+    "block1.depthwise": 0.4260980942670037,
+    "block1.pointwise": 0.255349671606924,
+    "block1.output": 1.217636048560049,
+    "block2.depthwise": 0.6866226495481005,
+    "block2.pointwise": 0.39205875770718446,
+    "block2.output": 1.2938466988357844,
+    "phase": 0.21537932448499786
+  },
+  "bicubic_base": {
+    "coefficient_file": "bicubic_phase_q14.json",
+    "kernel": "Keys cubic a=-0.75 (PyTorch bicubic compatible)",
+    "coefficient_format": "signed Q2.14",
+    "edge_rule": "replicate nearest edge sample for each tap",
+    "rounding": "nearest, ties away from zero after 2D sum",
+    "output_scale_rule": "clamp to uint8 after adding integer residual"
+  },
+  "residual_joins": {
+    "block1": {
+      "skip_multiplier_q31": 2089410840,
+      "skip_right_shift": 31,
+      "branch_multiplier_q31": 1801389652,
+      "branch_right_shift": 33,
+      "output_scale": 1.217636048560049,
+      "rom": "block1_join_constants.hex"
+    },
+    "block2": {
+      "skip_multiplier_q31": 2020991750,
+      "skip_right_shift": 31,
+      "branch_multiplier_q31": 1301452130,
+      "branch_right_shift": 32,
+      "output_scale": 1.2938466988357844,
+      "rom": "block2_join_constants.hex"
+    }
+  }
+}

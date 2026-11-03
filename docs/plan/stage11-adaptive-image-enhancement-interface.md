@@ -2,7 +2,7 @@
 
 ## 状态
 
-Stage 11 RTL 已按此接口接入曲线编号解析、帧边界参数切换和输出像素 LUT。尚未重新构建/烧录 Stage 11 位流，也未执行 RTL 仿真或时序检查；当前板上位流不可发送非零曲线编号。Stage 8 K3 基准仍要求扩展字节 43–62 全零。
+Stage 11 RTL 已按此接口接入曲线编号解析、帧边界参数切换和输出像素 LUT。参数曲线副本 `stage11_720p60hz_adaptive_image_enhancement_curve5_test` 于 2026-10-30 完成 PDS 构建，布线后 `All Constraints Met`，`ddrphy_sysclk` setup WNS `+0.215 ns`、TNS 0；完整曲线参数、`.sbit/.fic` 哈希和上板待办见 [图像增强实施计划](../chat/Image-Enhancement.md) 及副本 README。新位流尚未完成实板验证。原工程 `stage11_720p60hz_adaptive_image_enhancement_test` 已恢复到更新前状态。Stage 8 K3 基准仍要求扩展字节 43–62 全零。
 
 ## UART 请求与响应
 
