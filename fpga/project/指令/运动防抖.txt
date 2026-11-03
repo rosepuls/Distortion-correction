@@ -1,0 +1,20 @@
+脚本防抖测试
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+& '.\.venv\Scripts\python.exe' host\pose\stage13_motion_stabilization.py --dry-run --display
+
+
+单次位移
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+& '.\.venv\Scripts\python.exe' -c "import sys,serial; sys.path.insert(0,'host/pose'); from stage13_motion_stabilization import IDENTITY_ROWS,make_stage13_request; from measure_obs_rotation_send_uart import read_ack; s=123; p=make_stage13_request(s,[v for r in IDENTITY_ROWS for v in r],0,24.0,24.0); u=serial.Serial('COM7',115200,timeout=0.2,write_timeout=2.0); u.reset_input_buffer(); u.write(p); u.flush(); print('ACK',read_ack(u,s,p)[:7].hex(' ').upper()); u.close()"
+
+
+实时防抖
+
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+& '.\.venv\Scripts\python.exe' host\pose\stage13_motion_stabilization.py --source 2 --port COM7
+
+
+在 Distortion-correction 目录，先测关闭补偿的基线，再用相同场景测开启补偿：
+.\.venv\Scripts\python.exe host\pose\verify_motion_stabilization.py --mode fixed --control off
+.\.venv\Scripts\python.exe host\pose\verify_motion_stabilization.py --mode fixed --control on
+程序启动后只预览 OBS 和 HDMI 采集画面。按 空格开始测量，再按一次结束；q 退出。

@@ -82,6 +82,9 @@ module pixel_tile_cache #(
     input  wire [255:0]                 fill_data,
     input  wire [1:0]                   fill_data_row_index,
     input  wire [1:0]                   fill_data_beat_index,
+    // [3] refill active, [2] invalidation, [1] miss/retry hold,
+    // [0] response capacity full.
+    output wire [4:0]                   diagnostic_lookup_block_reason,
     output reg  [23:0]                  diagnostic_miss_count,
     output reg  [23:0]                  diagnostic_fill_cycles
 );
@@ -569,6 +572,26 @@ module pixel_tile_cache #(
     wire pipeline_advance = pipeline_operational && !retry_active
                             && (!s2_valid || !request_miss);
     assign lookup_ready = pipeline_advance && lookup_capacity;
+    wire lookup_blocked = lookup_valid && !lookup_ready;
+    wire lookup_blocked_by_invalidate = !rst_n || invalidate
+        || invalidate_pending || invalidate_active;
+    assign diagnostic_lookup_block_reason[3] = lookup_blocked
+        && (fill_state != FILL_IDLE);
+    assign diagnostic_lookup_block_reason[2] = lookup_blocked
+        && (fill_state == FILL_IDLE) && lookup_blocked_by_invalidate;
+    assign diagnostic_lookup_block_reason[1] = lookup_blocked
+        && (fill_state == FILL_IDLE) && !lookup_blocked_by_invalidate
+        && (retry_active || (s2_valid && request_miss));
+    assign diagnostic_lookup_block_reason[0] = lookup_blocked
+        && (fill_state == FILL_IDLE) && !lookup_blocked_by_invalidate
+        && !retry_active && !(s2_valid && request_miss)
+        && !lookup_capacity;
+    // Capacity blocked by reservations in the lookup/read pipeline before
+    // the response FIFO storage itself reaches its physical depth.
+    assign diagnostic_lookup_block_reason[4] = lookup_blocked
+        && (fill_state == FILL_IDLE) && !lookup_blocked_by_invalidate
+        && !retry_active && !(s2_valid && request_miss)
+        && !lookup_capacity && (fifo_count < RESPONSE_FIFO_DEPTH);
     wire external_lookup_fire = lookup_valid && lookup_ready;
     wire s2_fire = pipeline_advance && s2_valid;
     wire start_miss = pipeline_operational && s2_valid && request_miss

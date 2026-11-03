@@ -11,6 +11,9 @@ import cv2
 import numpy as np
 import serial
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from verification.device_config import load_device_config
+
 from encode_rotation_images_uart import crc16_ccitt_false
 from measure_obs_rotation_send_uart import read_ack
 from track_obs_rotation_continuous import parse_source
@@ -184,10 +187,12 @@ def resize_for_fpga(frame: np.ndarray, width: int, height: int) -> np.ndarray:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    devices = load_device_config()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=parse_source, default=2,
-                        help="OBS Virtual Camera index (default 2) or video path")
-    parser.add_argument("--port", default="COM7", help="USB-UART port (default COM7)")
+    parser.add_argument("--source", type=parse_source, default=devices["obs_virtual_camera_index"],
+                        help="OBS Virtual Camera index from device_config.json or video path")
+    parser.add_argument("--port", default=devices["uart_port"],
+                        help="USB-UART port from device_config.json")
     parser.add_argument("--profile", type=int, default=0,
                         help="Stage11 lighting profile to retain in the packet (0..5)")
     parser.add_argument("--width", type=int, default=FRAME_WIDTH,

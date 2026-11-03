@@ -1,0 +1,7 @@
+{
+  "obs_virtual_camera_index": 2,
+  "hdmi_capture_index": 1,
+  "uart_port": "COM7",
+  "width": 1280,
+  "height": 720
+}

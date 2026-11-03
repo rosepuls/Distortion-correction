@@ -14,6 +14,9 @@ from pathlib import Path
 import cv2
 import serial
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from verification.device_config import load_device_config
+
 from analyze_parallel_rotation import load_calibration as load_rotation_calibration
 from analyze_parallel_rotation import quantize, rotation_homography
 from encode_rotation_images_uart import crc16_ccitt_false, make_request, validate_stage8_profile
@@ -57,10 +60,12 @@ def make_stage11_request(sequence: int, rows: list[list[int]], profile_id: int) 
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    devices = load_device_config()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=parse_source, default=2,
-                        help="raw OBS Virtual Camera index (default 2) or video file")
-    parser.add_argument("--port", default="COM7", help="USB-UART port (default COM7)")
+    parser.add_argument("--source", type=parse_source, default=devices["obs_virtual_camera_index"],
+                        help="raw OBS Virtual Camera index from device_config.json or video file")
+    parser.add_argument("--port", default=devices["uart_port"],
+                        help="USB-UART port from device_config.json")
     parser.add_argument("--identity", action="store_true",
                         help="lighting only: send identity geometry instead of tracking angle")
     parser.add_argument("--calibration", type=Path, default=DEFAULT_CALIBRATION,

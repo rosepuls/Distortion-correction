@@ -102,7 +102,9 @@ module fram_buf #(
     wire [23:0] perf_frame_cycles /* synthesis PAP_MARK_DEBUG="true" */;
     wire [23:0] perf_coord_stall_cycles /* synthesis PAP_MARK_DEBUG="true" */;
     wire [23:0] perf_cache_miss_count /* synthesis PAP_MARK_DEBUG="true" */;
-    wire [23:0] perf_cache_fill_cycles;
+    wire [23:0] perf_cache_fill_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [23:0] perf_output_backpressure_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [20:0] perf_output_backpressure_fic /* synthesis PAP_MARK_DEBUG="true" */;
     wire [23:0] perf_read_ar_wait_cycles /* synthesis PAP_MARK_DEBUG="true" */;
     wire [23:0] perf_read_response_wait_cycles /* synthesis PAP_MARK_DEBUG="true" */;
     wire [23:0] perf_write_wait_cycles;
@@ -111,6 +113,13 @@ module fram_buf #(
     wire [23:0] perf_read_arready_wait_cycles /* synthesis PAP_MARK_DEBUG="true" */;
     wire [23:0] perf_read_first_beat_wait_cycles /* synthesis PAP_MARK_DEBUG="true" */;
     wire [23:0] perf_read_interbeat_wait_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [20:0] perf_reader_meta_fifo_stall_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [20:0] perf_cache_fill_block_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [20:0] perf_cache_invalidate_block_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [20:0] perf_cache_retry_miss_block_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [20:0] perf_cache_capacity_block_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    wire [20:0] perf_cache_capacity_pipe_block_cycles /* synthesis PAP_MARK_DEBUG="true" */;
+    assign perf_output_backpressure_fic = perf_output_backpressure_cycles[20:0];
     wire copy_read_wait_arbiter, copy_read_wait_arready;
     wire copy_read_valid, copy_read_reserve, copy_read_ready;
     wire [27:0] copy_read_addr;
@@ -232,6 +241,7 @@ module fram_buf #(
         .perf_coord_stall_cycles(perf_coord_stall_cycles),
         .perf_cache_miss_count(perf_cache_miss_count),
         .perf_cache_fill_cycles(perf_cache_fill_cycles),
+        .perf_output_backpressure_cycles(perf_output_backpressure_cycles),
         .perf_read_ar_wait_cycles(perf_read_ar_wait_cycles),
         .perf_read_response_wait_cycles(perf_read_response_wait_cycles),
         .perf_write_wait_cycles(perf_write_wait_cycles),
@@ -239,7 +249,13 @@ module fram_buf #(
         .perf_read_arbiter_wait_cycles(perf_read_arbiter_wait_cycles),
         .perf_read_arready_wait_cycles(perf_read_arready_wait_cycles),
         .perf_read_first_beat_wait_cycles(perf_read_first_beat_wait_cycles),
-        .perf_read_interbeat_wait_cycles(perf_read_interbeat_wait_cycles)
+        .perf_read_interbeat_wait_cycles(perf_read_interbeat_wait_cycles),
+        .perf_reader_meta_fifo_stall_cycles(perf_reader_meta_fifo_stall_cycles),
+        .perf_cache_fill_block_cycles(perf_cache_fill_block_cycles),
+        .perf_cache_invalidate_block_cycles(perf_cache_invalidate_block_cycles),
+        .perf_cache_retry_miss_block_cycles(perf_cache_retry_miss_block_cycles),
+        .perf_cache_capacity_block_cycles(perf_cache_capacity_block_cycles),
+        .perf_cache_capacity_pipe_block_cycles(perf_cache_capacity_pipe_block_cycles)
     );
     assign perf_error_flags = {
         8'd0,

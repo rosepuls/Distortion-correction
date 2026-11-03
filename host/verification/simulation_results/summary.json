@@ -1,0 +1,99 @@
+{
+  "type": "offline_idealized_simulation",
+  "seed": 20261103,
+  "rotation": {
+    "cases": [
+      {
+        "actual_deg": 0,
+        "estimated_deg": 0.0011,
+        "estimate_error_deg": 0.0011,
+        "blur_noise_estimated_deg": 0.0007,
+        "blur_noise_error_deg": 0.0007,
+        "output_residual_deg": 0.0,
+        "ideal_valid_area_percent": 99.783
+      },
+      {
+        "actual_deg": -20,
+        "estimated_deg": -20.0001,
+        "estimate_error_deg": -0.0001,
+        "blur_noise_estimated_deg": -19.9963,
+        "blur_noise_error_deg": 0.0037,
+        "output_residual_deg": -0.0044,
+        "ideal_valid_area_percent": 84.366
+      },
+      {
+        "actual_deg": -10,
+        "estimated_deg": -9.9983,
+        "estimate_error_deg": 0.0017,
+        "blur_noise_estimated_deg": -9.9987,
+        "blur_noise_error_deg": 0.0013,
+        "output_residual_deg": -0.0052,
+        "ideal_valid_area_percent": 91.048
+      },
+      {
+        "actual_deg": -5,
+        "estimated_deg": -4.9993,
+        "estimate_error_deg": 0.0007,
+        "blur_noise_estimated_deg": -4.9987,
+        "blur_noise_error_deg": 0.0013,
+        "output_residual_deg": -0.0026,
+        "ideal_valid_area_percent": 95.15
+      },
+      {
+        "actual_deg": 5,
+        "estimated_deg": 5.0015,
+        "estimate_error_deg": 0.0015,
+        "blur_noise_estimated_deg": 5.0006,
+        "blur_noise_error_deg": 0.0006,
+        "output_residual_deg": -0.0011,
+        "ideal_valid_area_percent": 95.148
+      },
+      {
+        "actual_deg": 10,
+        "estimated_deg": 9.9995,
+        "estimate_error_deg": -0.0005,
+        "blur_noise_estimated_deg": 9.9999,
+        "blur_noise_error_deg": -0.0001,
+        "output_residual_deg": 0.0004,
+        "ideal_valid_area_percent": 91.047
+      },
+      {
+        "actual_deg": 20,
+        "estimated_deg": 20.0011,
+        "estimate_error_deg": 0.0011,
+        "blur_noise_estimated_deg": 20.0005,
+        "blur_noise_error_deg": 0.0005,
+        "output_residual_deg": -0.0012,
+        "ideal_valid_area_percent": 84.365
+      },
+      {
+        "actual_deg": 0,
+        "estimated_deg": 0.0011,
+        "estimate_error_deg": 0.0011,
+        "blur_noise_estimated_deg": -0.0011,
+        "blur_noise_error_deg": -0.0011,
+        "output_residual_deg": 0.0,
+        "ideal_valid_area_percent": 99.783
+      }
+    ],
+    "max_abs_estimate_error_deg": 0.0017,
+    "max_abs_blur_noise_error_deg": 0.0037,
+    "max_abs_output_residual_deg": 0.0052
+  },
+  "stabilization": {
+    "frames": 120,
+    "simulated_rate_fps": 10,
+    "input_path_variance_px2": 27.8382,
+    "corrected_path_variance_px2": 2.944,
+    "variance_ratio": 0.1058,
+    "variance_reduction_percent": 89.42,
+    "median_flow_error_px_per_step": 0.0321,
+    "median_flow_confidence": 1.0,
+    "invalid_estimates": 0
+  },
+  "limitations": [
+    "software ideal sampler; no FPGA RTL",
+    "no UART ACK or HDMI capture",
+    "zero lens distortion and synthetic textures"
+  ]
+}

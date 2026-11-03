@@ -1,0 +1,1 @@
+create_clock -name {sr_clk} [get_ports {clk}] -period {8.000} -waveform {0.000 4.000}

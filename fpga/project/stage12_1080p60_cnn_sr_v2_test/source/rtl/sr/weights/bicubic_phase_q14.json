@@ -1,0 +1,41 @@
+{
+  "kernel": "Keys cubic a=-0.75 (PyTorch bicubic compatible)",
+  "scale": "3:2 center aligned: src=(dst+0.5)*2/3-0.5",
+  "coefficient_format": "signed Q2.14",
+  "phase_order": [
+    "5/6",
+    "1/2",
+    "1/6"
+  ],
+  "edge_rule": "replicate nearest edge sample for each tap",
+  "rounding": "nearest, exact ties away from zero, once after 2D sum",
+  "phases": [
+    {
+      "fraction": "5/6",
+      "weights_q14": [
+        -284,
+        2636,
+        15454,
+        -1422
+      ]
+    },
+    {
+      "fraction": "3/6",
+      "weights_q14": [
+        -1536,
+        9728,
+        9728,
+        -1536
+      ]
+    },
+    {
+      "fraction": "1/6",
+      "weights_q14": [
+        -1422,
+        15454,
+        2636,
+        -284
+      ]
+    }
+  ]
+}

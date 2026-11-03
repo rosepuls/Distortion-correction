@@ -1,0 +1,2 @@
+Set-Location 'C:\Study\IC_Study\Project\FPGA\Contest\Pango_Micro_FPGA\Distortion-correction'
+.\.venv\Scripts\python.exe host\pose\preview_hdmi_usb_capture.py
