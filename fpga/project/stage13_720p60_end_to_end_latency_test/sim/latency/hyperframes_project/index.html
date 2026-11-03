@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, height=720" />
+    <title>黑白交替测试视频</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      * { box-sizing: border-box; }
+      html, body {
+        width: 1280px;
+        height: 720px;
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+      #root, #field {
+        width: 1280px;
+        height: 720px;
+      }
+      #field {
+        background-color: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <main data-hf-id="hf-domi"
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="300"
+      data-width="1280"
+      data-height="720"
+    >
+      <div data-hf-id="hf-syyp" id="field" class="clip" data-start="0" data-duration="300" data-track-index="0"></div>
+    </main>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      for (let second = 0; second < 300; second += 1) {
+        tl.set("#field", { backgroundColor: second % 2 === 0 ? "#000000" : "#ffffff" }, second);
+      }
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>
