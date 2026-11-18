@@ -1,0 +1,42 @@
+##### Written on 2025/05/08 11:55:53 ###############################
+
+
+##### INFO ##################################################
+
+Current device : 
+	PG2L200H-6FBB676
+
+Top Module : 
+	pgd_ddr_lvds4to1_top
+
+Constraint File(s) : 
+	D:/Downloads/pg2l200/2_Demo/4_11_lvds_test/4_11_lvds_test/lvds_test/lvds_test/pnr/lvds_rx_tx.fdc
+
+##### SUMMARY ######################################################
+
+Found 0 error(s), 0 critical warning(s), 1 warning(s), out of 173 constraint(s)
+
+
+Inapplicable constraints(except overwritten constraints):
+********************************************
+
+define_attribute {p:tx_data_n[3]} {PAP_IO_DIFF_IN_TERM_MODE} {ON}
+	W: ConstraintEditor-4026: [D:/Downloads/pg2l200/2_Demo/4_11_lvds_test/4_11_lvds_test/lvds_test/lvds_test/pnr/lvds_rx_tx.fdc(line number: 243)] PAP_IO_DIFF_IN_TERM_MODE is already defined in p:tx_data_n[3], new value ON will overwrite the current value.
+
+
+Constraints with issues:
+********************************************
+
+
+Issues without commands:
+********************************************
+
+
+Unconstrained ports:
+********************************************
+
+
+Constraints with matching wildcard expressions:
+********************************************
+
+

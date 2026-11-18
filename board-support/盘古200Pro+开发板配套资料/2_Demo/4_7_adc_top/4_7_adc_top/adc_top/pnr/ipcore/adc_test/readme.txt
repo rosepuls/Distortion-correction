@@ -1,0 +1,27 @@
+--/example_design                                    //用于参考设计和IP仿真的.v文件
+  --bench/ipmxe_adc_sim_tb.v                         //用于IP核仿真的testbench文件
+  --rtl/ipmxe_adc_top.v                              //用于参考设计的上板顶层文件
+  --rtl/reset_and_sync                               //reset_and_sync模块RTL文件夹，提供复位同步化、去抖和外部信号去抖动功能
+  --rtl/uart_ctrl                                    //uart模块的代码
+--/pnr                                               //综合布局布线工程
+  --/example_design                                  //设计实例的综合布局布线工程文件及约束文件
+    --ipmxe_adc_top.pds                              //ADC IP Example Design PDS工程文件
+    --ipmxe_adc_top.fdc                              //ADC IP Example Design PDS约束文件
+  --/core_only                                       //IP Core的综合布局布线工程文件及约束文件
+    --$instname.pds                                  //ADC IP Core PDS工程文件，其中$instname为例化名
+    --$instname.fdc                                  //ADC IP Core PDS约束文件，其中$instname为例化名
+--/rtl                                               //ADC IP 明文代码，用于对输入信号进行处理
+  --ipmxe_adc_sync_v1_0.v                            //复位同步模块
+  --ipmxe_loadsc_n_gen_v1_0.v                        //对用户输入的信号进行同步处理后输送给硬核
+--/sim                                               //Simulation目录
+  --/modelsim                                        //ADC IP 仿真文件目录
+    --design.txt                                     //ADC仿真所需要的模拟输入波性文件，通过FOR_SIM宏定义加入
+    --ipmxe_adc_sim.do                               //用于仿真运行的.do文件
+    --ipmxe_adc_sim_filelist.f                       //用于仿真的filelist，被ipmxe_adc_sim.do调用
+    --ipmxe_adc_sim_wave.do                          //用于仿真运行的波形加载.do文件，被ipmxe_adc_sim.do调用
+    --sim.bat                                        //用于运行ipmxe_adc_sim.do的脚本
+--generate.log                                       //IP生成日志信息
+--$instname.idf                                      //IP的.idf文件，其中$instname是用户输入的例化名
+--$instname.v                                        //IP的wrapper文件，其中$instname是用户输入的例化名
+--$instname_tmpl.v                                   //IP wrapper的verilog例化文件，方便用户使用，其中$instname是用户输入的例化名
+--$instname_tmpl.vhdl                                //IP wrapper的vhdl例化文件，方便用户使用，其中$instname是用户输入的例化名

@@ -1,0 +1,39 @@
+##### Written on 2025/04/29 14:40:31 ###############################
+
+
+##### INFO ##################################################
+
+Current device : 
+	PG2L200H-6FBB676
+
+Top Module : 
+	led_test
+
+Constraint File(s) : 
+	D:/Downloads/pg2l200/2_Demo/2_3_sim/2_3_sim/3_3_sim/source/led_test.fdc
+
+##### SUMMARY ######################################################
+
+Found 0 error(s), 0 critical warning(s), 0 warning(s), out of 66 constraint(s)
+
+
+Inapplicable constraints(except overwritten constraints):
+********************************************
+
+
+Constraints with issues:
+********************************************
+
+
+Issues without commands:
+********************************************
+
+
+Unconstrained ports:
+********************************************
+
+
+Constraints with matching wildcard expressions:
+********************************************
+
+

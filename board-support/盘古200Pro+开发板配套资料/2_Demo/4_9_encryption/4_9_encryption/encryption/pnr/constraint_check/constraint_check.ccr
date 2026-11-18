@@ -1,0 +1,39 @@
+##### Written on 2025/05/02 16:10:52 ###############################
+
+
+##### INFO ##################################################
+
+Current device : 
+	PG2L200H-6FBB676
+
+Top Module : 
+	encryption_test
+
+Constraint File(s) : 
+	D:/Downloads/pg2l200/2_Demo/4_9_encryption/4_9_encryption/encryption/pnr/encryption_test.fdc
+
+##### SUMMARY ######################################################
+
+Found 0 error(s), 0 critical warning(s), 0 warning(s), out of 66 constraint(s)
+
+
+Inapplicable constraints(except overwritten constraints):
+********************************************
+
+
+Constraints with issues:
+********************************************
+
+
+Issues without commands:
+********************************************
+
+
+Unconstrained ports:
+********************************************
+
+
+Constraints with matching wildcard expressions:
+********************************************
+
+

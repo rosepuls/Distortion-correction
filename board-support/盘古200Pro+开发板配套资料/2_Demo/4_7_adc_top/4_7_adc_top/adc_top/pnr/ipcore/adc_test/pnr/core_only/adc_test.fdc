@@ -1,0 +1,14 @@
+###==== BEGIN Clocks
+create_clock -name {i_apb_clk} [get_ports {i_apb_clk}] -period {20}
+###==== END Clocks
+
+###==== BEGIN "Generated Clocks"
+###==== END "Generated Clocks"
+
+###==== BEGIN "Inputs/Outputs"
+###==== END "Inputs/Outputs"
+###==== BEGIN Attributes - (Populated from tab in SCOPE, do not edit)
+###==== END Attributes
+
+###==== BEGIN Attributes - IO table (Populated from tab in SCOPE, do not edit)
+###==== END Attributes(IO table)
