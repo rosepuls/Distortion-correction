@@ -1,0 +1,6 @@
+###=== BEGIN Clocks
+create_clock -name {apb_clk} [get_ports {apb_clk}] -period {20}
+###=== END Clocks
+
+###==== BEGIN Attributes - IO table (Populated from tab in SCOPE,do not edit)
+###==== END Attributes(IO table)

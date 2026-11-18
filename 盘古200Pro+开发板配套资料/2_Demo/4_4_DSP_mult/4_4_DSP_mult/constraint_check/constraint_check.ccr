@@ -1,0 +1,42 @@
+##### Written on 2025/05/02 16:02:50 ###############################
+
+
+##### INFO ##################################################
+
+Current device : 
+	PG2L200H-6FBB676
+
+Top Module : 
+	DSP_mult
+
+Constraint File(s) : 
+	D:/Downloads/pg2l200/2_Demo/4_4_DSP_mult/4_4_DSP_mult/source/DSP_mult.fdc
+
+##### SUMMARY ######################################################
+
+Found 0 error(s), 0 critical warning(s), 3 warning(s), out of 10 constraint(s)
+
+
+Inapplicable constraints(except overwritten constraints):
+********************************************
+
+
+Constraints with issues:
+********************************************
+
+
+Issues without commands:
+********************************************
+
+
+Unconstrained ports:
+********************************************
+
+W: ConstraintEditor-4019: Port Bus 'P' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port Bus 'X' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port Bus 'Y' unspecified I/O constraint.
+
+Constraints with matching wildcard expressions:
+********************************************
+
+
