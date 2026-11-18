@@ -1,0 +1,59 @@
+##### Written on 2025/03/11 20:32:38 ###############################
+
+
+##### INFO ##################################################
+
+Current device : 
+	PG2L100H-6FBG676
+
+Top Module : 
+	hsst_test_dut_top
+
+Constraint File(s) : 
+	E:/project/mes100_676/fmc_demo/fmc_serdes_test/fmc_serdes_test/hsst_test/ipcore/hsst_test/pnr/example_design/pango_hsstlp_top.fdc
+
+##### SUMMARY ######################################################
+
+Found 0 error(s), 0 critical warning(s), 16 warning(s), out of 38 constraint(s)
+
+
+Inapplicable constraints(except overwritten constraints):
+********************************************
+
+define_attribute {p:i_p_refckn_0} {PAP_IO_LOC} {AB11}
+	W: ConstraintEditor-4024: Location AB11 is special io location. Only location will take effect. If the other io attribute have set on port p:i_p_refckn_0, will be ignored.
+
+define_attribute {p:i_p_refckp_0} {PAP_IO_LOC} {AA11}
+	W: ConstraintEditor-4024: Location AA11 is special io location. Only location will take effect. If the other io attribute have set on port p:i_p_refckp_0, will be ignored.
+
+
+Constraints with issues:
+********************************************
+
+
+Issues without commands:
+********************************************
+
+
+Unconstrained ports:
+********************************************
+
+W: ConstraintEditor-4019: Port Bus 'o_pl_err' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port Bus 'o_rdecer_0' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port Bus 'o_rdisper_0' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port Bus 'o_rxstatus_0' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port Bus 'o_wtchdg_st_0' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port 'i_p_l0rxn' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port 'i_p_l0rxp' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port 'o_p_l0txn' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port 'o_p_l0txp' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port 'o_p_lx_cdr_align_0' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port 'o_p_pcs_lsm_synced_0' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port 'o_p_pll_lock_0' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port 'o_p_rx_sigdet_sta_0' unspecified I/O constraint.
+W: ConstraintEditor-4019: Port 'o_pll_done_0' unspecified I/O constraint.
+
+Constraints with matching wildcard expressions:
+********************************************
+
+
